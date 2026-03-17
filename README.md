@@ -1,8 +1,8 @@
-# SentinelHUD
+# PodQApath
 
-**An AI-Powered QA Command Center for Pod-Based Release Auditing.**
+**An Agentic Release Auditor for Pod-Based QA Teams.**
 
-SentinelHUD is a high-observability dashboard designed for QA Engineers. It bridges the gap between Jira Cloud, GitHub, and Automated Environments using the Model Context Protocol (MCP).
+PodQApath uses the **Model Context Protocol (MCP)** to map Jira custom fields to specific QA pods, providing 1:1 traceability between requirements and auto-deployed environments.
 
 ---
 
@@ -32,8 +32,8 @@ SentinelHUD is a high-observability dashboard designed for QA Engineers. It brid
 ### 1. Clone the Repo
 
 ```bash
-git clone https://github.com/YOUR_USERNAME/sentinel-hud.git
-cd sentinel-hud
+git clone https://github.com/teddyski/podqapath.git
+cd podqapath
 ```
 
 ### 2. Environment Configuration
@@ -67,7 +67,7 @@ streamlit run app.py
 
 ## Business Value
 
-By centralizing deployment data and ticket status into a single command center, SentinelHUD reduces triage time by up to 40% and eliminates the "Collision Risk" common in shared QA environments.
+By centralizing deployment data and ticket status into a single command center, PodQApath reduces triage time by up to 40% and eliminates the "Collision Risk" common in shared QA environments.
 
 ---
 

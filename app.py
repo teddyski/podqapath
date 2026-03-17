@@ -1,6 +1,6 @@
 """
-app.py — QA Analytics Dashboard (MCP Client Edition)
-Command Center: Jira | Git | Chat
+app.py — PodQApath | Command Center
+Jira | Git | Chat
 """
 
 import os
@@ -18,8 +18,8 @@ load_dotenv()
 # ---------------------------------------------------------------------------
 
 st.set_page_config(
-    page_title="QA Analytics Dashboard",
-    page_icon="🔬",
+    page_title="PodQApath | Command Center",
+    page_icon="🛡️",
     layout="wide",
     initial_sidebar_state="expanded",
 )
@@ -96,7 +96,8 @@ for k, v in defaults.items():
 # ---------------------------------------------------------------------------
 
 with st.sidebar:
-    st.title("🔬 QA Command Center")
+    st.title("🛡️ PodQApath")
+    st.markdown("### *Bridging the gap between Pods, Tickets, and Code*")
     st.divider()
 
     mode_label = st.radio(
