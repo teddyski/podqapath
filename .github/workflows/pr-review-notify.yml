@@ -1,0 +1,24 @@
+name: Request Review on PR Ready
+
+# Fires when a draft PR is converted to "Ready for Review"
+# Assigns @teddyski as reviewer → triggers a GitHub Mobile push notification
+on:
+  pull_request:
+    types: [ready_for_review]
+
+jobs:
+  request-review:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Request review from repo owner
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            await github.rest.pulls.requestReviewers({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: context.payload.pull_request.number,
+              reviewers: ['teddyski'],
+            });
+            console.log(`Review requested from teddyski on PR #${context.payload.pull_request.number}`);
