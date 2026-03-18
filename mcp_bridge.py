@@ -153,14 +153,19 @@ def fetch_jira_via_mcp(jira_url: str, email: str, token: str,
     raw = _extract_text(result)
 
     # mcp-atlassian returns markdown or JSON — try JSON first
+    import logging
     rows = []
     try:
         data = json.loads(raw)
         issues = data if isinstance(data, list) else data.get("issues", [])
         for issue in issues:
+            key = issue.get("key", "")
+            if not key:
+                logging.warning("fetch_jira_via_mcp: skipping issue with missing key: %s", issue)
+                continue
             f = issue.get("fields", issue)
             rows.append({
-                "Issue Key": issue.get("key", ""),
+                "Issue Key": key,
                 "Summary": f.get("summary", ""),
                 "Priority": (f.get("priority") or {}).get("name", "Unknown"),
                 "Status": (f.get("status") or {}).get("name", "Unknown"),
@@ -169,11 +174,8 @@ def fetch_jira_via_mcp(jira_url: str, email: str, token: str,
                 "Component": ", ".join(c["name"] for c in (f.get("components") or [])) or "None",
                 "Days Open": _days_since(f.get("created", "")),
             })
-    except (json.JSONDecodeError, KeyError):
-        # Fallback: store raw text in a single-row DataFrame
-        rows = [{"Issue Key": "RAW", "Summary": raw[:500], "Priority": "Unknown",
-                 "Status": "Unknown", "Assignee": "Unassigned",
-                 "Issue Type": "Unknown", "Component": "None", "Days Open": 0}]
+    except (json.JSONDecodeError, KeyError) as e:
+        logging.warning("fetch_jira_via_mcp: could not parse MCP response as JSON (%s). Raw: %s", e, raw[:200])
 
     df = pd.DataFrame(rows) if rows else pd.DataFrame()
     return _normalize_jira_df(df)
