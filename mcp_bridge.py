@@ -811,6 +811,94 @@ def fetch_live_jira(base_url: str, email: str, token: str,
 
 
 # ---------------------------------------------------------------------------
+# Jira Filter Helpers (labels, statuses, sprints via REST API)
+# ---------------------------------------------------------------------------
+
+def fetch_jira_labels(base_url: str, email: str, token: str, project_key: str) -> list[str]:
+    """Fetch all unique labels used in the Jira project."""
+    import requests
+    from requests.auth import HTTPBasicAuth
+
+    resp = requests.post(
+        f"{base_url.rstrip('/')}/rest/api/3/search/jql",
+        headers={"Accept": "application/json", "Content-Type": "application/json"},
+        json={"jql": f"project = {project_key} AND labels is not EMPTY",
+              "maxResults": 100, "fields": ["labels"]},
+        auth=HTTPBasicAuth(email, token),
+        timeout=15,
+    )
+    resp.raise_for_status()
+    labels: set[str] = set()
+    for issue in resp.json().get("issues", []):
+        for label in issue.get("fields", {}).get("labels", []):
+            labels.add(label)
+    return sorted(labels)
+
+
+def fetch_jira_statuses(base_url: str, email: str, token: str, project_key: str) -> list[str]:
+    """Fetch all statuses available in the Jira project."""
+    import requests
+    from requests.auth import HTTPBasicAuth
+
+    resp = requests.get(
+        f"{base_url.rstrip('/')}/rest/api/3/project/{project_key}/statuses",
+        headers={"Accept": "application/json"},
+        auth=HTTPBasicAuth(email, token),
+        timeout=10,
+    )
+    resp.raise_for_status()
+    statuses: set[str] = set()
+    for issue_type in resp.json():
+        for status in issue_type.get("statuses", []):
+            name = status.get("name", "")
+            if name:
+                statuses.add(name)
+    return sorted(statuses)
+
+
+def fetch_jira_sprints(base_url: str, email: str, token: str, project_key: str) -> list[str]:
+    """Fetch all sprints (active and closed) for the Jira project."""
+    import requests
+    from requests.auth import HTTPBasicAuth
+
+    auth = HTTPBasicAuth(email, token)
+    headers = {"Accept": "application/json"}
+    base = base_url.rstrip("/")
+
+    boards_resp = requests.get(
+        f"{base}/rest/agile/1.0/board",
+        params={"projectKeyOrId": project_key},
+        headers=headers, auth=auth, timeout=10,
+    )
+    if boards_resp.status_code != 200:
+        return []
+    boards = boards_resp.json().get("values", [])
+    if not boards:
+        return []
+
+    board_id = boards[0]["id"]
+    sprints: list[str] = []
+    start = 0
+    while True:
+        resp = requests.get(
+            f"{base}/rest/agile/1.0/board/{board_id}/sprint",
+            params={"startAt": start, "maxResults": 50},
+            headers=headers, auth=auth, timeout=10,
+        )
+        if resp.status_code != 200:
+            break
+        data = resp.json()
+        for sprint in data.get("values", []):
+            name = sprint.get("name", "")
+            if name:
+                sprints.append(name)
+        if data.get("isLast", True):
+            break
+        start += 50
+    return sprints
+
+
+# ---------------------------------------------------------------------------
 # Risk Scoring
 # ---------------------------------------------------------------------------
 

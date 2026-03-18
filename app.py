@@ -82,6 +82,14 @@ defaults = {
     "_jira_token": "",
     "_github_token": "",
     "_project_key": "",
+    # Live mode filter state
+    "_available_tags": [],
+    "_available_statuses": [],
+    "_available_sprints": [],
+    "_filters_loaded": False,
+    "_filter_tags": [],
+    "_filter_statuses": [],
+    "_filter_sprints": [],
     # Release Audit / Environment Monitor
     "qa_payload": [],           # merged PRs from last 24h
     "collision_warnings": [],   # cross-PR file/module collisions
@@ -162,103 +170,144 @@ with st.sidebar:
 
     # ---- LIVE MCP MODE ----
     else:
-        st.subheader("Jira Credentials")
-        base_url    = st.text_input("Jira Base URL",  value=os.getenv("JIRA_BASE_URL", ""),      placeholder="https://org.atlassian.net")
-        email       = st.text_input("Email",          value=os.getenv("JIRA_EMAIL", ""))
-        token       = st.text_input("API Token",      value=os.getenv("JIRA_API_TOKEN", ""),      type="password")
-        project_key = st.text_input("Project Key",    value=os.getenv("JIRA_PROJECT_KEY", "PROJ"))
-        max_results = st.number_input("Max Results",  min_value=10, max_value=500, value=50, step=10)
+        # Load credentials exclusively from .env
+        base_url     = os.getenv("JIRA_BASE_URL", "")
+        email        = os.getenv("JIRA_EMAIL", "")
+        token        = os.getenv("JIRA_API_TOKEN", "")
+        project_key  = os.getenv("JIRA_PROJECT_KEY", "PROJ")
+        github_token = os.getenv("GITHUB_TOKEN", "")
+        max_results  = int(os.getenv("JIRA_MAX_RESULTS", "50"))
+        repo_path    = os.getenv("GIT_REPO_PATH", "")
 
-        st.subheader("Environment Monitor")
-        repo_path = st.text_input("Local Repo Path", value=os.getenv("GIT_REPO_PATH", ""),
-                                   placeholder="/path/to/your/repo")
-
-        github_token = st.text_input("GitHub Token (for PR diff)", type="password",
-                                      value=os.getenv("GITHUB_TOKEN", ""),
-                                      help="Optional — enables PR diff in Column 2")
+        missing_vars = [k for k, v in {
+            "JIRA_BASE_URL": base_url, "JIRA_EMAIL": email,
+            "JIRA_API_TOKEN": token, "JIRA_PROJECT_KEY": project_key,
+        }.items() if not v]
+        if missing_vars:
+            st.error(f"Missing .env vars: {', '.join(missing_vars)}")
 
         use_mcp = st.toggle("Use MCP Server", value=True,
                              help="Connect via mcp-atlassian. Disable to use plain REST API.")
 
-        if st.button("Fetch Live Data", use_container_width=True, type="primary"):
-            if not all([base_url, email, token, project_key]):
-                st.error("Jira URL, email, token, and project key are required.")
-            else:
-                # Build JQL — apply pod + status filters if set
-                jql_parts = [f"project = {project_key}"]
-                if selected_pod != "All Pods":
-                    jql_parts.append(f'"{POD_FIELD_ID}" = "{selected_pod}"')
-                if selected_status != "All Statuses":
-                    jql_parts.append(f'status = "{selected_status}"')
-                jql_parts.append("ORDER BY created DESC")
-                custom_jql = " AND ".join(jql_parts[:-1]) + " " + jql_parts[-1]
+        # ---- Connect & Load Filters ----
+        if st.button("Connect & Load Filters", use_container_width=True,
+                     disabled=bool(missing_vars)):
+            with st.spinner("Fetching filters from Jira..."):
+                try:
+                    st.session_state._available_tags     = bridge.fetch_jira_labels(base_url, email, token, project_key)
+                    st.session_state._available_statuses = bridge.fetch_jira_statuses(base_url, email, token, project_key)
+                    st.session_state._available_sprints  = bridge.fetch_jira_sprints(base_url, email, token, project_key)
+                    st.session_state._filters_loaded     = True
+                    st.session_state._jira_base_url      = base_url
+                    st.session_state._jira_email         = email
+                    st.session_state._jira_token         = token
+                    st.session_state._github_token       = github_token
+                    st.session_state._project_key        = project_key
+                    st.success("Filters loaded")
+                except Exception as e:
+                    st.error(f"Failed to load filters: {e}")
 
-                st.caption(f"JQL: `{custom_jql}`")
+        # ---- Filter Dropdowns ----
+        _tag_default    = [t for t in st.session_state._filter_tags     if t in st.session_state._available_tags]
+        _status_default = [s for s in st.session_state._filter_statuses if s in st.session_state._available_statuses]
+        _sprint_default = [s for s in st.session_state._filter_sprints  if s in st.session_state._available_sprints]
 
-                # --- Jira ---
-                if use_mcp:
-                    with st.spinner("Connecting to Atlassian MCP server..."):
-                        try:
-                            jira_params = bridge.atlassian_server_params(base_url, email, token)
-                            st.session_state.jira_df = bridge.fetch_jira_via_mcp(
-                                base_url, email, token, project_key, max_results,
-                                jql_override=custom_jql,
-                            )
-                            params_list = [jira_params]
-                            tools = bridge.list_mcp_tools(jira_params)
-                            st.session_state.mcp_tools_available = [t.name for t in tools]
-                            st.success(f"MCP: fetched {len(st.session_state.jira_df)} issues "
-                                       f"({len(tools)} tools available)")
-                        except Exception as e:
-                            st.warning(f"MCP failed ({e}). Falling back to REST API...")
-                            try:
-                                st.session_state.jira_df = bridge.fetch_live_jira(
-                                    base_url, email, token, project_key, max_results,
-                                    jql_override=custom_jql,
-                                )
-                                params_list = []
-                                st.session_state.mcp_tools_available = []
-                                st.success(f"REST: fetched {len(st.session_state.jira_df)} issues")
-                            except Exception as e2:
-                                st.error(f"REST API also failed: {e2}")
-                                params_list = []
-                else:
-                    with st.spinner("Fetching from Jira REST API..."):
+        st.session_state._filter_tags = st.multiselect(
+            "Tags", options=st.session_state._available_tags, default=_tag_default,
+            placeholder="All tags", disabled=not st.session_state._filters_loaded,
+        )
+        st.session_state._filter_statuses = st.multiselect(
+            "Statuses", options=st.session_state._available_statuses, default=_status_default,
+            placeholder="All statuses", disabled=not st.session_state._filters_loaded,
+        )
+        st.session_state._filter_sprints = st.multiselect(
+            "Sprint", options=st.session_state._available_sprints, default=_sprint_default,
+            placeholder="All sprints", disabled=not st.session_state._filters_loaded,
+        )
+
+        if st.button("Fetch Live Data", use_container_width=True, type="primary",
+                     disabled=bool(missing_vars)):
+            # Build JQL — apply pod + dropdown filters
+            jql_parts = [f"project = {project_key}"]
+            if selected_pod != "All Pods":
+                jql_parts.append(f'"{POD_FIELD_ID}" = "{selected_pod}"')
+            if selected_status != "All Statuses":
+                jql_parts.append(f'status = "{selected_status}"')
+            if st.session_state._filter_tags:
+                tags_jql = ", ".join(f'"{t}"' for t in st.session_state._filter_tags)
+                jql_parts.append(f"labels in ({tags_jql})")
+            if st.session_state._filter_statuses:
+                statuses_jql = ", ".join(f'"{s}"' for s in st.session_state._filter_statuses)
+                jql_parts.append(f"status in ({statuses_jql})")
+            if st.session_state._filter_sprints:
+                sprints_jql = ", ".join(f'"{s}"' for s in st.session_state._filter_sprints)
+                jql_parts.append(f"sprint in ({sprints_jql})")
+            jql_parts.append("ORDER BY created DESC")
+            custom_jql = " AND ".join(jql_parts[:-1]) + " " + jql_parts[-1]
+
+            st.caption(f"JQL: `{custom_jql}`")
+
+            params_list = []
+            # --- Jira ---
+            if use_mcp:
+                with st.spinner("Connecting to Atlassian MCP server..."):
+                    try:
+                        jira_params = bridge.atlassian_server_params(base_url, email, token)
+                        st.session_state.jira_df = bridge.fetch_jira_via_mcp(
+                            base_url, email, token, project_key, max_results,
+                            jql_override=custom_jql,
+                        )
+                        params_list = [jira_params]
+                        tools = bridge.list_mcp_tools(jira_params)
+                        st.session_state.mcp_tools_available = [t.name for t in tools]
+                        st.success(f"MCP: fetched {len(st.session_state.jira_df)} issues "
+                                   f"({len(tools)} tools available)")
+                    except Exception as e:
+                        st.warning(f"MCP failed ({e}). Falling back to REST API...")
                         try:
                             st.session_state.jira_df = bridge.fetch_live_jira(
                                 base_url, email, token, project_key, max_results,
                                 jql_override=custom_jql,
                             )
-                            params_list = []
                             st.session_state.mcp_tools_available = []
                             st.success(f"REST: fetched {len(st.session_state.jira_df)} issues")
-                        except Exception as e:
-                            st.error(f"Jira API error: {e}")
-                            params_list = []
+                        except Exception as e2:
+                            st.error(f"REST API also failed: {e2}")
+            else:
+                with st.spinner("Fetching from Jira REST API..."):
+                    try:
+                        st.session_state.jira_df = bridge.fetch_live_jira(
+                            base_url, email, token, project_key, max_results,
+                            jql_override=custom_jql,
+                        )
+                        st.session_state.mcp_tools_available = []
+                        st.success(f"REST: fetched {len(st.session_state.jira_df)} issues")
+                    except Exception as e:
+                        st.error(f"Jira API error: {e}")
 
-                # Reset payload on new fetch
-                st.session_state.qa_payload        = []
-                st.session_state.collision_warnings = []
-                st.session_state.not_yet_deployed   = []
+            # Reset payload on new fetch
+            st.session_state.qa_payload        = []
+            st.session_state.collision_warnings = []
+            st.session_state.not_yet_deployed   = []
 
-                # --- Git via MCP ---
-                if repo_path and use_mcp:
-                    with st.spinner("Connecting to Git MCP server..."):
-                        try:
-                            git_params = bridge.git_server_params(repo_path)
-                            st.session_state.git_df = bridge.fetch_git_status_via_mcp(repo_path)
-                            git_tools = bridge.list_mcp_tools(git_params)
-                            params_list.append(git_params)
-                            st.success(f"Git MCP: {len(git_tools)} tools available")
-                        except Exception as e:
-                            st.warning(f"Git MCP unavailable: {e}")
+            # --- Git via MCP ---
+            if repo_path and use_mcp:
+                with st.spinner("Connecting to Git MCP server..."):
+                    try:
+                        git_params = bridge.git_server_params(repo_path)
+                        st.session_state.git_df = bridge.fetch_git_status_via_mcp(repo_path)
+                        git_tools = bridge.list_mcp_tools(git_params)
+                        params_list.append(git_params)
+                        st.success(f"Git MCP: {len(git_tools)} tools available")
+                    except Exception as e:
+                        st.warning(f"Git MCP unavailable: {e}")
 
-                st.session_state.mcp_server_params = params_list
-                st.session_state._jira_base_url = base_url
-                st.session_state._jira_email    = email
-                st.session_state._jira_token    = token
-                st.session_state._github_token  = github_token
-                st.session_state._project_key   = project_key
+            st.session_state.mcp_server_params = params_list
+            st.session_state._jira_base_url    = base_url
+            st.session_state._jira_email       = email
+            st.session_state._jira_token       = token
+            st.session_state._github_token     = github_token
+            st.session_state._project_key      = project_key
 
     # ---- QA Payload (live mode only) ----
     if st.session_state.mode == "live":
