@@ -52,8 +52,8 @@ def atlassian_server_params(jira_url: str, email: str, token: str):
 def git_server_params(repo_path: str):
     from mcp import StdioServerParameters
     return StdioServerParameters(
-        command="npx",
-        args=["-y", "@modelcontextprotocol/server-git", "--repository", repo_path],
+        command=str(_VENV_BIN / "mcp-server-git"),
+        args=["--repository", repo_path],
         env=dict(os.environ),
     )
 
@@ -617,11 +617,12 @@ def fetch_qa_payload(
     # Query recently updated tickets
     jql = (f'project = {project_key} AND updated >= "-{hours}h" '
            f'ORDER BY updated DESC')
-    resp = requests.get(
-        f"{base}/rest/api/3/search",
-        params={"jql": jql, "maxResults": 40,
-                "fields": "id,key,summary,status"},
-        headers=headers, auth=auth, timeout=15,
+    resp = requests.post(
+        f"{base}/rest/api/3/search/jql",
+        json={"jql": jql, "maxResults": 40,
+              "fields": ["id", "summary", "status"]},
+        headers={**headers, "Content-Type": "application/json"},
+        auth=auth, timeout=15,
     )
     resp.raise_for_status()
 
@@ -779,13 +780,14 @@ def fetch_live_jira(base_url: str, email: str, token: str,
     from requests.auth import HTTPBasicAuth
 
     jql = jql_override if jql_override else f"project = {project_key} ORDER BY created DESC"
-    url = f"{base_url.rstrip('/')}/rest/api/3/search"
-    resp = requests.get(
+    url = f"{base_url.rstrip('/')}/rest/api/3/search/jql"
+    resp = requests.post(
         url,
-        headers={"Accept": "application/json"},
-        params={"jql": jql,
-                "maxResults": max_results,
-                "fields": "summary,priority,status,assignee,issuetype,components,created"},
+        headers={"Accept": "application/json", "Content-Type": "application/json"},
+        json={"jql": jql,
+              "maxResults": max_results,
+              "fields": ["summary", "priority", "status", "assignee",
+                         "issuetype", "components", "created"]},
         auth=HTTPBasicAuth(email, token),
         timeout=15,
     )

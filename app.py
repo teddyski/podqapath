@@ -369,34 +369,41 @@ with col1:
         )
         display_df = df_scored[df_scored["RiskBand"].isin(filter_band)].reset_index(drop=True)
 
-        # Selectable dataframe — row click triggers rerun
-        selection = st.dataframe(
-            display_df[["Issue Key", "Summary", "Priority", "Status",
-                        "Assignee", "Assigned QA", "RiskScore", "RiskBand", "PR"]],
-            use_container_width=True,
-            height=300,
-            on_select="rerun",
-            selection_mode="single-row",
-            key="jira_table",
-        )
+        BAND_EMOJI = {"RED": "🔴", "ORANGE": "🟠", "YELLOW": "🟡", "GREEN": "🟢"}
+
+        # Card grid — 2 per row
+        card_rows = [display_df.iloc[i:i + 2] for i in range(0, len(display_df), 2)]
+        for row_chunk in card_rows:
+            card_cols = st.columns(2)
+            for col, (_, card_row) in zip(card_cols, row_chunk.iterrows()):
+                c_key    = card_row["Issue Key"]
+                band     = card_row["RiskBand"]
+                status   = card_row["Status"]
+                pr_icon  = card_row["PR"]
+                selected = st.session_state.selected_ticket_key == c_key
+                with col:
+                    with st.container(border=True):
+                        st.markdown(f"{BAND_EMOJI.get(band, '⚪')} **{c_key}** {pr_icon}")
+                        st.caption(status)
+                        if st.button(
+                            "✓ Selected" if selected else "Select",
+                            key=f"card_{c_key}",
+                            use_container_width=True,
+                            type="primary" if selected else "secondary",
+                        ):
+                            if st.session_state.selected_ticket_key != c_key:
+                                st.session_state.selected_ticket_key = c_key
+                                st.session_state.dev_status_data     = None
+                                st.session_state.pr_diff_data        = None
+                            st.rerun()
 
         red_count = int((df_scored["RiskBand"] == "RED").sum())
         if red_count >= 3:
             st.error(f"⚠️ RELEASE BLOCK — {red_count} critical issues require immediate attention.")
 
         # ---- Ticket Detail & PR Panel ----
-        selected_rows = selection.selection.rows
-        if selected_rows:
-            selected_idx = selected_rows[0]
-            ticket_row   = display_df.iloc[selected_idx]
-            ticket_key   = ticket_row["Issue Key"]
-
-            # Update selected ticket key; reset dev-status if ticket changed
-            if st.session_state.selected_ticket_key != ticket_key:
-                st.session_state.selected_ticket_key = ticket_key
-                st.session_state.dev_status_data     = None
-                st.session_state.pr_diff_data        = None
-
+        ticket_key = st.session_state.selected_ticket_key
+        if ticket_key and ticket_key in display_df["Issue Key"].values:
             st.divider()
 
             # Traceability Badge
