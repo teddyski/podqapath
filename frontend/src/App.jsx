@@ -45,6 +45,7 @@ export default function App() {
     setSelectedTicket(ticket)
     setPrData(null)
     setLoadingPR(true)
+    setShowTestRunner(false) // bring PR viewer to front when selecting
     try {
       const data = await fetchPRDiff(ticket['Issue Key'], demoMode)
       setPrData(data)
@@ -57,12 +58,12 @@ export default function App() {
 
   const handleTestTicket = useCallback((ticket) => {
     if (ticket['Issue Key'] === selectedTicket?.['Issue Key']) {
-      // Already selected — just toggle the runner panel
+      // Already selected and PR loaded — toggle runner to front/back
       setShowTestRunner(v => !v)
     } else {
-      // New ticket — select it (loads PR) and show the runner when ready
+      // Different ticket — select it first (PR viewer comes to front via handleSelectTicket)
+      // then the user can hit Test again to bring the runner up
       handleSelectTicket(ticket)
-      setShowTestRunner(true)
     }
   }, [selectedTicket, handleSelectTicket])
 
