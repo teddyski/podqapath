@@ -24,8 +24,14 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
-AGENT_MD_PATH = Path(__file__).parent / "QA_AGENT.md"
-QA_SYSTEM_PROMPT = AGENT_MD_PATH.read_text() if AGENT_MD_PATH.exists() else "You are a QA assistant."
+_PERSONA_FILES = {
+    "technical": Path(__file__).parent / "QA_AGENT.md",
+    "manager":   Path(__file__).parent / "QA_MANAGER.md",
+}
+
+def _load_persona(mode: str) -> str:
+    p = _PERSONA_FILES.get(mode, _PERSONA_FILES["technical"])
+    return p.read_text() if p.exists() else "You are a QA assistant."
 
 # ---------------------------------------------------------------------------
 # Pod Configuration
@@ -94,6 +100,8 @@ defaults = {
     "qa_payload": [],           # merged PRs from last 24h
     "collision_warnings": [],   # cross-PR file/module collisions
     "not_yet_deployed": [],     # Ready for QA tickets with open PRs
+    # Persona toggle
+    "persona_mode": "technical",
 }
 for k, v in defaults.items():
     if k not in st.session_state:
@@ -353,7 +361,7 @@ with st.sidebar:
 
     # Risk overview
     if st.session_state.jira_df is not None:
-        df_scored = bridge.compute_risk_scores(st.session_state.jira_df, st.session_state.git_df)
+        df_scored = bridge.compute_risk_scores(st.session_state.jira_df, st.session_state.git_df, st.session_state.traceability_cache)
         band_counts = df_scored["RiskBand"].value_counts()
         st.subheader("Risk Overview")
         for band, emoji in [("RED", "🔴"), ("ORANGE", "🟠"), ("YELLOW", "🟡"), ("GREEN", "🟢")]:
@@ -398,7 +406,7 @@ with col1:
     if st.session_state.jira_df is None:
         st.info("No Jira data. Upload a CSV or connect via the sidebar.")
     else:
-        df_scored = bridge.compute_risk_scores(st.session_state.jira_df, st.session_state.git_df)
+        df_scored = bridge.compute_risk_scores(st.session_state.jira_df, st.session_state.git_df, st.session_state.traceability_cache)
 
         # Assigned QA column
         if "Pod" in df_scored.columns:
@@ -419,10 +427,10 @@ with col1:
 
         BAND_EMOJI = {"RED": "🔴", "ORANGE": "🟠", "YELLOW": "🟡", "GREEN": "🟢"}
         BAND_LABEL = {
-            "RED":    ("🔴 Critical risk", "Score 81–100 — needs attention before release"),
-            "ORANGE": ("🟠 High risk",     "Score 61–80 — review carefully"),
-            "YELLOW": ("🟡 Medium risk",   "Score 31–60 — monitor closely"),
-            "GREEN":  ("🟢 Low risk",      "Score 0–30 — looking good"),
+            "RED":    ("🔴 Critical risk", "Score 81–100 — release is imminent or health is critical; block until resolved"),
+            "ORANGE": ("🟠 High risk",     "Score 61–80 — release proximity or multiple health flags; needs owner attention now"),
+            "YELLOW": ("🟡 Medium risk",   "Score 31–60 — some risk signals present; monitor and assign before sprint end"),
+            "GREEN":  ("🟢 Low risk",      "Score 0–30 — release not imminent and ticket is healthy; safe to proceed"),
         }
 
         with st.expander("Risk score guide", expanded=False):
@@ -430,7 +438,8 @@ with col1:
                 label, desc = BAND_LABEL[band]
                 st.markdown(f"**{label}** — {desc}")
             st.caption(
-                "Score factors: priority (+5–30), days open (+0–20), "
+                "Dominant factor: release proximity — ≤2 days +70, ≤7 days +35, ≤14 days +20, ≤21 days +5  |  "
+                "Other factors: priority (+5–30), days open (+0–20), "
                 "no linked branch (+25), bug in core/API (+15), unassigned (+10)"
             )
 
@@ -705,8 +714,17 @@ with col3:
         else:
             st.caption("✅ Chat mode — load live data to enable agentic tool use")
 
+    # Persona toggle
+    persona_label = st.toggle("Manager mode", value=st.session_state.persona_mode == "manager", key="persona_toggle")
+    new_mode = "manager" if persona_label else "technical"
+    if new_mode != st.session_state.persona_mode:
+        st.session_state.persona_mode = new_mode
+        st.session_state.chat_history = []
+        st.rerun()
+    st.caption("Manager mode — plain language, no jargon." if persona_label else "Technical mode — full QA Lead analysis.")
+
     # Chat history display
-    chat_container = st.container(height=360)
+    chat_container = st.container(height=520)
     with chat_container:
         for msg in st.session_state.chat_history:
             with st.chat_message(msg["role"]):
@@ -741,7 +759,7 @@ with col3:
         )
 
         if st.session_state.jira_df is not None:
-            df_s = bridge.compute_risk_scores(st.session_state.jira_df, st.session_state.git_df)
+            df_s = bridge.compute_risk_scores(st.session_state.jira_df, st.session_state.git_df, st.session_state.traceability_cache)
             if "Pod" in df_s.columns:
                 df_s["Assigned QA"] = df_s["Pod"].map(POD_QA_MAP).fillna("Unassigned")
             else:
@@ -842,7 +860,7 @@ with col3:
             st.session_state.chat_history.append({"role": "user", "content": user_input})
 
             data_context = build_data_context()
-            system = QA_SYSTEM_PROMPT + "\n\n---\n\n# LIVE DASHBOARD DATA\n\n" + data_context
+            system = _load_persona(st.session_state.persona_mode) + "\n\n---\n\n# LIVE DASHBOARD DATA\n\n" + data_context
 
             messages = []
             for m in st.session_state.chat_history:
@@ -889,6 +907,3 @@ with col3:
             except Exception as e:
                 st.error(f"QA-7 error: {e}")
 
-    if st.button("Clear Chat", use_container_width=True):
-        st.session_state.chat_history = []
-        st.rerun()
