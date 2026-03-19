@@ -4,7 +4,7 @@ import { loadFilters } from '../api'
 // ---------------------------------------------------------------------------
 // Multi-select dropdown
 // ---------------------------------------------------------------------------
-function MultiSelect({ label, options, selected, onChange, disabled, placeholder }) {
+function MultiSelect({ label, options, selected, onChange, disabled, placeholder, testId }) {
   const [open, setOpen] = useState(false)
   const ref = useRef(null)
 
@@ -35,6 +35,7 @@ function MultiSelect({ label, options, selected, onChange, disabled, placeholder
         onClick={() => !disabled && setOpen(o => !o)}
         disabled={disabled}
         type="button"
+        data-testid={testId}
       >
         <span className="multiselect-summary">{summary}</span>
         <span className="multiselect-arrow">{open ? '▲' : '▼'}</span>
@@ -67,7 +68,7 @@ export default function Sidebar({
   projectKey, onProjectKeyChange,
   filters, onFiltersLoaded,
   activeFilters, onActiveFiltersChange,
-  onFetchTickets, loading,
+  onFetchTickets, onLoadDemo, loading,
 }) {
   const [filtersLoading, setFiltersLoading] = useState(false)
   const [filtersError, setFiltersError] = useState('')
@@ -101,10 +102,26 @@ export default function Sidebar({
   const selectedSprintNames = (activeFilters.sprintNames || []).filter(n => n in (filters.sprints || {}))
 
   return (
-    <aside className="sidebar">
+    <aside className="sidebar" data-testid="sidebar">
       <div className="sidebar-header">
         <span className="sidebar-logo">🛡️</span>
         <span className="sidebar-title">PodQApath</span>
+      </div>
+
+      {/* ── Demo Mode ── */}
+      <div className="connect-form" style={{ borderBottom: '1px solid var(--border)', paddingBottom: '0.75rem', marginBottom: '0.75rem' }}>
+        <button
+          className="btn btn-secondary"
+          onClick={onLoadDemo}
+          disabled={loading}
+          data-testid="demo-mode-btn"
+          style={{ width: '100%' }}
+        >
+          🧪 Load Demo Data
+        </button>
+        <p style={{ margin: '0.3rem 0 0', fontSize: '0.7rem', color: 'var(--text-muted, #888)' }}>
+          No credentials needed
+        </p>
       </div>
 
       {/* ── Connect form ── */}
@@ -120,11 +137,13 @@ export default function Sidebar({
           onKeyDown={e => e.key === 'Enter' && handleConnect()}
           placeholder="e.g. SCRUM"
           disabled={filtersLoading}
+          data-testid="project-key-input"
         />
         <button
           className="btn btn-secondary"
           onClick={handleConnect}
           disabled={filtersLoading || !projectKey.trim()}
+          data-testid="connect-btn"
         >
           {filtersLoading ? 'Connecting…' : 'Connect & Load Filters'}
         </button>
@@ -145,6 +164,7 @@ export default function Sidebar({
           onChange={setTags}
           disabled={!filtersLoaded}
           placeholder="All tags"
+          testId="filter-tags"
         />
         <MultiSelect
           label="Statuses"
@@ -153,6 +173,7 @@ export default function Sidebar({
           onChange={setStatuses}
           disabled={!filtersLoaded}
           placeholder="All statuses"
+          testId="filter-statuses"
         />
         <MultiSelect
           label="Sprint"
@@ -161,6 +182,7 @@ export default function Sidebar({
           onChange={setSprints}
           disabled={!filtersLoaded}
           placeholder="All sprints"
+          testId="filter-sprint"
         />
       </div>
 
@@ -169,6 +191,7 @@ export default function Sidebar({
         onClick={onFetchTickets}
         disabled={loading || !filtersLoaded}
         title={!filtersLoaded ? 'Connect first to load filters' : ''}
+        data-testid="fetch-btn"
       >
         {loading ? 'Fetching…' : '☁️ Fetch Live Data'}
       </button>

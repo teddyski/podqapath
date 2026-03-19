@@ -1,16 +1,16 @@
 const BASE = '/api'
 
-export async function loadFilters(projectKey) {
+export async function loadFilters(projectKey, demoMode = false) {
   const res = await fetch(`${BASE}/filters`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ project_key: projectKey }),
+    body: JSON.stringify({ project_key: projectKey, demo_mode: demoMode }),
   })
   if (!res.ok) throw new Error(await res.text())
   return res.json()
 }
 
-export async function fetchTickets({ projectKey, tags, statuses, sprintIds }) {
+export async function fetchTickets({ projectKey, tags, statuses, sprintIds, demoMode = false }) {
   const res = await fetch(`${BASE}/tickets`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -19,17 +19,18 @@ export async function fetchTickets({ projectKey, tags, statuses, sprintIds }) {
       tags: tags || [],
       statuses: statuses || [],
       sprint_ids: sprintIds || [],
+      demo_mode: demoMode,
     }),
   })
   if (!res.ok) throw new Error(await res.text())
   return res.json()
 }
 
-export async function fetchPRDiff(ticketKey) {
+export async function fetchPRDiff(ticketKey, demoMode = false) {
   const res = await fetch(`${BASE}/pr-diff`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ ticket_key: ticketKey }),
+    body: JSON.stringify({ ticket_key: ticketKey, demo_mode: demoMode }),
   })
   if (!res.ok) throw new Error(await res.text())
   return res.json()

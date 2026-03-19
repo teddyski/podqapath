@@ -16,6 +16,11 @@ load_dotenv()
 
 app = FastAPI(title="PodQApath API")
 
+DEMO_MODE = os.getenv("DEMO_MODE", "").lower() == "true"
+
+def _is_demo(req_demo_mode: bool) -> bool:
+    return DEMO_MODE or req_demo_mode
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["http://localhost:5173", "http://localhost:3000"],
@@ -40,15 +45,18 @@ def _require_jira():
 # ---------------------------------------------------------------------------
 class FiltersRequest(BaseModel):
     project_key: str
+    demo_mode: bool = False
 
 class TicketsRequest(BaseModel):
     project_key: str
     tags: list[str] = []
     statuses: list[str] = []
     sprint_ids: list[int] = []
+    demo_mode: bool = False
 
 class PRDiffRequest(BaseModel):
     ticket_key: str
+    demo_mode: bool = False
 
 class ChatRequest(BaseModel):
     message: str
@@ -65,6 +73,8 @@ def health():
 
 @app.post("/api/filters")
 def load_filters(req: FiltersRequest):
+    if _is_demo(req.demo_mode):
+        return bridge.generate_sample_filters()
     _require_jira()
     if not req.project_key.strip():
         raise HTTPException(status_code=400, detail="project_key is required")
@@ -78,6 +88,11 @@ def load_filters(req: FiltersRequest):
 
 @app.post("/api/tickets")
 def fetch_tickets(req: TicketsRequest):
+    if _is_demo(req.demo_mode):
+        df = bridge.generate_sample_jira_df()
+        df_scored = bridge.compute_risk_scores(df)
+        df_scored = df_scored.fillna("")
+        return df_scored.to_dict(orient="records")
     _require_jira()
     try:
         project_key = req.project_key
@@ -96,7 +111,6 @@ def fetch_tickets(req: TicketsRequest):
 
         df = bridge.fetch_live_jira(JIRA_URL, JIRA_EMAIL, JIRA_TOKEN, project_key, jql_override=jql)
         df_scored = bridge.compute_risk_scores(df)
-        # Replace NaN/None with safe defaults for JSON
         df_scored = df_scored.fillna("")
         return df_scored.to_dict(orient="records")
     except Exception as e:
@@ -104,6 +118,8 @@ def fetch_tickets(req: TicketsRequest):
 
 @app.post("/api/pr-diff")
 def fetch_pr_diff(req: PRDiffRequest):
+    if _is_demo(req.demo_mode):
+        return bridge.generate_sample_pr_data(req.ticket_key)
     _require_jira()
     try:
         dev = bridge.fetch_dev_status(JIRA_URL, JIRA_EMAIL, JIRA_TOKEN, req.ticket_key)

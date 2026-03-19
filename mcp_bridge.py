@@ -378,23 +378,30 @@ def load_git_csv(uploaded_file) -> pd.DataFrame:
 
 
 def generate_sample_jira_df() -> pd.DataFrame:
+    """
+    Realistic demo dataset covering all four risk bands plus collision and
+    not-yet-deployed scenarios (SCRUM-21).
+    Dates assume today ≈ 2026-03-18 to produce deterministic risk scores.
+    """
     data = {
-        "Issue Key": ["PROJ-101", "PROJ-102", "PROJ-103", "PROJ-104", "PROJ-105"],
+        "Issue Key": ["DEMO-101", "DEMO-102", "DEMO-103", "DEMO-104", "DEMO-105", "DEMO-106"],
         "Summary": [
-            "Login page crashes on mobile",
-            "Add dark mode toggle",
-            "API rate limit not enforced",
-            "Update onboarding copy",
-            "Memory leak in data pipeline",
+            "Auth middleware silently drops refresh tokens on mobile Safari",
+            "API rate limiter not applied to /v2/export endpoint",
+            "Update onboarding email sequence — new brand voice",
+            "Add dark mode toggle to user settings panel",
+            "Migrate session token storage to HttpOnly cookies",
+            "Webhook retry logic fails silently after 3 attempts",
         ],
-        "Priority": ["Critical", "Low", "High", "Medium", "Critical"],
-        "Status": ["In Progress", "To Do", "In Progress", "Done", "Open"],
-        "Assignee": ["alice", "bob", "Unassigned", "carol", "Unassigned"],
-        "Issue Type": ["Bug", "Story", "Bug", "Task", "Bug"],
-        "Component": ["core", "ui", "api", "docs", "core"],
-        "Days Open": [3, 21, 7, 1, 30],
-        "FixVersionDate": ["2026-03-20", "", "2026-03-25", "", ""],
-        "SprintEndDate":  ["", "2026-04-08", "", "", "2026-04-15"],
+        "Priority":   ["Critical", "High",  "Medium", "Low",   "High",  "High"],
+        "Status":     ["In Progress", "In Progress", "In Review", "To Do", "In Review", "Ready for QA"],
+        "Assignee":   ["Unassigned", "priya.sharma", "carlos.mendes", "hana.okonkwo", "alex.chen", "priya.sharma"],
+        "Issue Type": ["Bug",  "Bug",   "Task",  "Story", "Bug",  "Bug"],
+        "Component":  ["auth", "api",   "messaging", "ui", "auth", "api"],
+        "Days Open":  [3,      8,       5,       2,       12,      15],
+        # 2 days out → RED;  14 days → ORANGE;  20 days → YELLOW;  58 days → GREEN
+        "FixVersionDate": ["2026-03-20", "2026-04-01", "2026-04-07", "2026-05-15", "2026-03-20", "2026-03-25"],
+        "SprintEndDate":  ["", "", "", "", "", ""],
     }
     return _normalize_jira_df(pd.DataFrame(data))
 
@@ -402,25 +409,233 @@ def generate_sample_jira_df() -> pd.DataFrame:
 def generate_sample_git_df() -> pd.DataFrame:
     data = {
         "Branch": [
-            "feature/PROJ-102", "bugfix/PROJ-101", "hotfix/PROJ-999",
-            "main", "feature/no-ticket", "bugfix/PROJ-103",
+            "bugfix/DEMO-101-safari-refresh",
+            "bugfix/DEMO-102-rate-limiter",
+            "feature/DEMO-103-onboarding-copy",
+            "feature/DEMO-104-dark-mode",
+            "bugfix/DEMO-105-httponly-cookies",   # collision: also touches auth files
+            "bugfix/DEMO-106-webhook-retry",
         ],
-        "Author": ["bob", "alice", "dave", "ci-bot", "eve", "mallory"],
+        "Author": ["ghost-eng", "priya.sharma", "carlos.mendes", "hana.okonkwo", "alex.chen", "priya.sharma"],
         "Last Commit": [
-            "2026-03-15", "2026-03-16", "2026-03-10",
-            "2026-03-17", "2026-03-01", "2026-03-14",
+            "2026-03-17", "2026-03-16", "2026-03-15",
+            "2026-03-14", "2026-03-17", "2026-03-16",
         ],
-        "Merged": [False, False, True, False, False, False],
+        "Merged": [False, False, False, False, False, False],
         "Files Changed": [
-            "ui/darkmode.js, ui/theme.css",
-            "auth.py, login.py, src/utils.py",
-            "billing.py, stripe.py, test_billing.py",
-            "",
-            "legacy_exporter.py, old_pipeline.py",
-            "api/rate_limiter.py, config.py, migrations/0042_add_index.py",
+            # DEMO-101 and DEMO-105 both touch src/auth/middleware.py → collision
+            "src/auth/middleware.py, src/auth/token_store.py, src/utils/cookie_helpers.py",
+            "src/api/rate_limiter.py, src/api/export_handler.py, config/api_config.py",
+            "emails/onboarding_sequence.html, emails/brand_templates.py",
+            "ui/components/ThemeToggle.jsx, ui/styles/theme.css",
+            "src/auth/middleware.py, src/auth/session_store.py, migrations/0047_httponly.py",
+            "src/workers/webhook_retry.py, src/workers/task_queue.py, tests/test_webhook.py",
         ],
     }
     return pd.DataFrame(data)
+
+
+def generate_sample_filters() -> dict:
+    """Sample filter options for demo/offline mode (SCRUM-21)."""
+    return {
+        "labels": ["auth", "api", "regression", "sprint-critical", "needs-qa", "perf"],
+        "statuses": ["To Do", "In Progress", "In Review", "Ready for QA", "Done"],
+        "sprints": {
+            "Sprint 12 — Auth Hardening": 42,
+            "Sprint 13 — API Stability": 43,
+        },
+    }
+
+
+def generate_sample_pr_data(ticket_key: str) -> dict:
+    """
+    Return realistic fake PR + diff data for a demo ticket key (SCRUM-21).
+    Covers: open PR, merged PR, no PR, and not-yet-deployed scenarios.
+    """
+    _data: dict[str, dict] = {
+        "DEMO-101": {
+            "prs": [{
+                "title": "fix(auth): handle refresh token expiry on Safari mobile",
+                "url": "https://github.com/acmecorp/platform/pull/847",
+                "status": "OPEN",
+                "author": "ghost-eng",
+                "source_branch": "bugfix/DEMO-101-safari-refresh",
+                "destination_branch": "main",
+                "app_type": "GitHub",
+            }],
+            "diff": {
+                "title": "fix(auth): handle refresh token expiry on Safari mobile",
+                "body": "Fixes silent token drop on mobile Safari when ITP blocks third-party cookies.",
+                "state": "open",
+                "changed_files": 3,
+                "additions": 87,
+                "deletions": 23,
+                "files": [
+                    {"filename": "src/auth/middleware.py",       "status": "modified", "additions": 45, "deletions": 18},
+                    {"filename": "src/auth/token_store.py",      "status": "modified", "additions": 32, "deletions": 5},
+                    {"filename": "src/utils/cookie_helpers.py",  "status": "added",    "additions": 10, "deletions": 0},
+                ],
+                "diff_summary": (
+                    "--- a/src/auth/middleware.py\n+++ b/src/auth/middleware.py\n"
+                    "@@ -42,7 +42,12 @@\n"
+                    "-    if not token:\n-        return None\n"
+                    "+    if not token:\n"
+                    "+        # Safari ITP strips third-party cookies; fall back to HttpOnly session token\n"
+                    "+        token = request.cookies.get('_session_fallback')\n"
+                    "+        if not token:\n"
+                    "+            return None"
+                ),
+                "error": None,
+            },
+            "description": "Auth middleware silently drops refresh tokens when Safari ITP blocks third-party cookie access. Affects ~12% of mobile users on iOS 17+.",
+        },
+        "DEMO-102": {
+            "prs": [{
+                "title": "fix(api): enforce rate limit on /v2/export",
+                "url": "https://github.com/acmecorp/platform/pull/851",
+                "status": "OPEN",
+                "author": "priya.sharma",
+                "source_branch": "bugfix/DEMO-102-rate-limiter",
+                "destination_branch": "main",
+                "app_type": "GitHub",
+            }],
+            "diff": {
+                "title": "fix(api): enforce rate limit on /v2/export",
+                "body": "Applies the existing TokenBucketRateLimiter to the /v2/export route which was inadvertently excluded.",
+                "state": "open",
+                "changed_files": 3,
+                "additions": 41,
+                "deletions": 8,
+                "files": [
+                    {"filename": "src/api/rate_limiter.py",    "status": "modified", "additions": 22, "deletions": 5},
+                    {"filename": "src/api/export_handler.py",  "status": "modified", "additions": 14, "deletions": 3},
+                    {"filename": "config/api_config.py",       "status": "modified", "additions": 5,  "deletions": 0},
+                ],
+                "diff_summary": (
+                    "--- a/src/api/export_handler.py\n+++ b/src/api/export_handler.py\n"
+                    "@@ -18,6 +18,8 @@\n"
+                    " @router.get('/v2/export')\n"
+                    "+@rate_limiter.limit('100/hour')\n"
+                    " async def export_data(request: Request):\n"
+                ),
+                "error": None,
+            },
+            "description": "The /v2/export endpoint bypasses the global rate limiter because it was registered after the middleware chain was finalized.",
+        },
+        "DEMO-103": {
+            # No PR yet — tests the 'no PR' state
+            "prs": [],
+            "diff": None,
+            "description": "Update all transactional onboarding emails to use the new Q2 brand voice guidelines. Affects welcome, day-3, and day-7 drip sequences.",
+        },
+        "DEMO-104": {
+            "prs": [{
+                "title": "feat(ui): add dark mode toggle to settings",
+                "url": "https://github.com/acmecorp/platform/pull/839",
+                "status": "MERGED",
+                "author": "hana.okonkwo",
+                "source_branch": "feature/DEMO-104-dark-mode",
+                "destination_branch": "main",
+                "app_type": "GitHub",
+            }],
+            "diff": {
+                "title": "feat(ui): add dark mode toggle to settings",
+                "body": "Adds a system-preference-aware dark mode toggle. Preference is persisted in localStorage.",
+                "state": "closed",
+                "changed_files": 2,
+                "additions": 58,
+                "deletions": 4,
+                "files": [
+                    {"filename": "ui/components/ThemeToggle.jsx", "status": "added",    "additions": 52, "deletions": 0},
+                    {"filename": "ui/styles/theme.css",           "status": "modified", "additions": 6,  "deletions": 4},
+                ],
+                "diff_summary": (
+                    "+// ThemeToggle.jsx\n"
+                    "+export function ThemeToggle() {\n"
+                    "+  const [dark, setDark] = useState(\n"
+                    "+    () => localStorage.getItem('theme') === 'dark'\n"
+                    "+  )\n"
+                ),
+                "error": None,
+            },
+            "description": "Users have requested a dark mode option. The toggle should respect the system preference on first load and persist the user's override.",
+        },
+        "DEMO-105": {
+            # Collision: also touches src/auth/middleware.py (same as DEMO-101)
+            "prs": [{
+                "title": "fix(auth): migrate session tokens to HttpOnly cookies",
+                "url": "https://github.com/acmecorp/platform/pull/849",
+                "status": "OPEN",
+                "author": "alex.chen",
+                "source_branch": "bugfix/DEMO-105-httponly-cookies",
+                "destination_branch": "main",
+                "app_type": "GitHub",
+            }],
+            "diff": {
+                "title": "fix(auth): migrate session tokens to HttpOnly cookies",
+                "body": "Replaces localStorage-based session token with HttpOnly cookie to prevent XSS exfiltration.",
+                "state": "open",
+                "changed_files": 3,
+                "additions": 112,
+                "deletions": 67,
+                "files": [
+                    {"filename": "src/auth/middleware.py",     "status": "modified", "additions": 55, "deletions": 40},
+                    {"filename": "src/auth/session_store.py",  "status": "modified", "additions": 42, "deletions": 27},
+                    {"filename": "migrations/0047_httponly.py","status": "added",    "additions": 15, "deletions": 0},
+                ],
+                "diff_summary": (
+                    "--- a/src/auth/middleware.py\n+++ b/src/auth/middleware.py\n"
+                    "@@ -10,5 +10,8 @@\n"
+                    "-    token = request.headers.get('X-Session-Token')\n"
+                    "+    token = request.cookies.get('session_id')  # HttpOnly; not accessible to JS\n"
+                    "+    if not token:\n"
+                    "+        raise AuthenticationError('Missing session cookie')\n"
+                ),
+                "error": None,
+            },
+            "description": "Session tokens currently stored in localStorage are vulnerable to XSS. This PR moves them to HttpOnly cookies set by the server.",
+        },
+        "DEMO-106": {
+            # Not-yet-deployed: status 'Ready for QA' but PR is still OPEN
+            "prs": [{
+                "title": "fix(workers): add exponential backoff to webhook retry",
+                "url": "https://github.com/acmecorp/platform/pull/852",
+                "status": "OPEN",
+                "author": "priya.sharma",
+                "source_branch": "bugfix/DEMO-106-webhook-retry",
+                "destination_branch": "main",
+                "app_type": "GitHub",
+            }],
+            "diff": {
+                "title": "fix(workers): add exponential backoff to webhook retry",
+                "body": "After 3 failed attempts the worker silently marks the job done. This PR adds exponential backoff (max 5 attempts) and a dead-letter queue.",
+                "state": "open",
+                "changed_files": 3,
+                "additions": 94,
+                "deletions": 31,
+                "files": [
+                    {"filename": "src/workers/webhook_retry.py", "status": "modified", "additions": 68, "deletions": 25},
+                    {"filename": "src/workers/task_queue.py",    "status": "modified", "additions": 11, "deletions": 6},
+                    {"filename": "tests/test_webhook.py",        "status": "modified", "additions": 15, "deletions": 0},
+                ],
+                "diff_summary": (
+                    "--- a/src/workers/webhook_retry.py\n+++ b/src/workers/webhook_retry.py\n"
+                    "@@ -33,8 +33,14 @@\n"
+                    "-    if attempt >= 3:\n-        mark_done(job_id)\n"
+                    "+    if attempt >= MAX_ATTEMPTS:\n"
+                    "+        dead_letter_queue.push(job_id)\n"
+                    "+        logger.error('Webhook job %s exhausted retries', job_id)\n"
+                    "+        return\n"
+                    "+    delay = min(2 ** attempt, 300)  # cap at 5 minutes\n"
+                    "+    schedule_retry(job_id, delay_seconds=delay)\n"
+                ),
+                "error": None,
+            },
+            "description": "Webhook delivery fails silently after 3 attempts with no logging, no dead-letter queue, and no alerting. Affects payment confirmation and third-party integrations.",
+        },
+    }
+    result = _data.get(ticket_key, {"prs": [], "diff": None, "description": ""})
+    return result
 
 
 # ---------------------------------------------------------------------------
