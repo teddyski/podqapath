@@ -434,7 +434,8 @@ with col1:
                 "no linked branch (+25), bug in core/API (+15), unassigned (+10)"
             )
 
-        # Card list — full width, stacked
+        # Card list — scrollable fixed-height window
+        card_scroll = st.container(height=600)
         for _, card_row in display_df.iterrows():
             c_key    = card_row["Issue Key"]
             band     = card_row["RiskBand"]
@@ -443,7 +444,7 @@ with col1:
             pr_icon  = card_row["PR"]
             reasons  = card_row.get("RiskReasons") or []
             selected = st.session_state.selected_ticket_key == c_key
-            with st.container(border=True):
+            with card_scroll.container(border=True):
                 summary = str(card_row.get("Summary", ""))
                 summary_short = summary[:55] + "…" if len(summary) > 55 else summary
                 jira_base = st.session_state.get("_jira_base_url", "").rstrip("/")
