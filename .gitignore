@@ -18,3 +18,8 @@ ai_log.txt
 
 # Claude Code local config
 .claude/
+
+# Frontend build artifacts
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
