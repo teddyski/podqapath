@@ -1,7 +1,7 @@
 const BAND_COLOR = { RED: '#ff4b4b', ORANGE: '#ff8c00', YELLOW: '#ffd700', GREEN: '#21c354' }
 const BAND_EMOJI = { RED: '🔴', ORANGE: '🟠', YELLOW: '🟡', GREEN: '🟢' }
 
-export default function TicketList({ tickets, loading, selectedKey, onSelect, onTest }) {
+export default function TicketList({ tickets, loading, selectedKey, loadingPR, onSelect, onTest }) {
   if (loading) return <div className="state-msg">Loading tickets…</div>
   if (!tickets.length) return (
     <div className="state-msg">
@@ -17,6 +17,7 @@ export default function TicketList({ tickets, loading, selectedKey, onSelect, on
         const color = BAND_COLOR[band] || '#21c354'
         const reasons = Array.isArray(t.RiskReasons) ? t.RiskReasons : []
         const isSelected = key === selectedKey
+        const testDisabled = isSelected && loadingPR
 
         return (
           <div
@@ -49,10 +50,11 @@ export default function TicketList({ tickets, loading, selectedKey, onSelect, on
               <button
                 className="btn btn-ghost ticket-test-btn"
                 onClick={() => onTest(t)}
+                disabled={testDisabled}
                 data-testid={`ticket-test-btn-${key}`}
-                title="Load PR diff and run tests"
+                title={testDisabled ? 'Loading PR…' : 'Show test runner'}
               >
-                ▶ Test
+                {testDisabled ? '⏳' : '▶ Test'}
               </button>
             </div>
           </div>

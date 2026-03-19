@@ -20,7 +20,7 @@ export default function App() {
   const [loadingPR, setLoadingPR] = useState(false)
   const [demoMode, setDemoMode] = useState(false)
   const [testResults, setTestResults] = useState('')
-  const [autoRunTest, setAutoRunTest] = useState(false)
+  const [showTestRunner, setShowTestRunner] = useState(false)
 
   const handleFetchTickets = useCallback(async () => {
     setLoadingTickets(true)
@@ -56,9 +56,15 @@ export default function App() {
   }, [demoMode])
 
   const handleTestTicket = useCallback((ticket) => {
-    setAutoRunTest(true)
-    handleSelectTicket(ticket)
-  }, [handleSelectTicket])
+    if (ticket['Issue Key'] === selectedTicket?.['Issue Key']) {
+      // Already selected — just toggle the runner panel
+      setShowTestRunner(v => !v)
+    } else {
+      // New ticket — select it (loads PR) and show the runner when ready
+      handleSelectTicket(ticket)
+      setShowTestRunner(true)
+    }
+  }, [selectedTicket, handleSelectTicket])
 
   const handleLoadDemo = useCallback(async () => {
     setDemoMode(true)
@@ -146,6 +152,13 @@ export default function App() {
     return parts.join('\n\n')
   })()
 
+  // Extract GitHub repo base URL from loaded PR data for TestRunner auto-fill
+  const autoFillUrl = (() => {
+    const prUrl = prData?.prs?.[0]?.url || ''
+    const m = prUrl.match(/^(https:\/\/github\.com\/[^/]+\/[^/]+)/)
+    return m ? m[1] : ''
+  })()
+
   return (
     <div className="app" data-testid="app">
       <Sidebar
@@ -167,23 +180,26 @@ export default function App() {
             tickets={tickets}
             loading={loadingTickets}
             selectedKey={selectedTicket?.['Issue Key']}
+            loadingPR={loadingPR}
             onSelect={handleSelectTicket}
             onTest={handleTestTicket}
           />
         </section>
         <section className="col col-diff">
           <h2>🔍 Code Change Viewer</h2>
-          <PRDiffViewer
-            ticket={selectedTicket}
-            data={prData}
-            loading={loadingPR}
-          />
-          <TestRunner
-            prData={prData}
-            autoRunTest={autoRunTest}
-            onClearAutoRun={() => setAutoRunTest(false)}
-            onResultsUpdate={setTestResults}
-          />
+          <div style={{ order: showTestRunner ? 1 : 0 }}>
+            <PRDiffViewer
+              ticket={selectedTicket}
+              data={prData}
+              loading={loadingPR}
+            />
+          </div>
+          <div style={{ order: showTestRunner ? 0 : 1 }}>
+            <TestRunner
+              autoFillUrl={autoFillUrl}
+              onResultsUpdate={setTestResults}
+            />
+          </div>
         </section>
         <section className="col col-chat">
           <h2>🤖 QA-7</h2>
