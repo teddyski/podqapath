@@ -52,7 +52,7 @@ export default function ChatPanel({ context }) {
           <input
             type="checkbox"
             checked={managerMode}
-            onChange={e => setManagerMode(e.target.checked)}
+            onChange={e => { setManagerMode(e.target.checked); setHistory([]) }}
             className="toggle-input"
           />
           <span className="toggle-track" />

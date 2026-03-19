@@ -51,12 +51,62 @@ export default function App() {
   }, [])
 
   // Build context string for QA-7
-  const chatContext = tickets.length
-    ? `Project: ${projectKey}\nTicket count: ${tickets.length}\n` +
-      tickets.slice(0, 10).map(t =>
-        `${t['Issue Key']} [${t.RiskBand}] ${t.Summary} — ${t.Status}`
-      ).join('\n')
-    : ''
+  const chatContext = (() => {
+    const parts = []
+
+    if (tickets.length) {
+      parts.push(
+        `## Loaded Tickets (${tickets.length} total, project: ${projectKey})\n` +
+        tickets.map(t =>
+          `- ${t['Issue Key']} [${t.RiskBand} score:${t.RiskScore}] ${t.Summary} — ${t.Status} | ${t.Priority} | ${t.Assignee}`
+        ).join('\n')
+      )
+    }
+
+    if (selectedTicket) {
+      const t = selectedTicket
+      parts.push(
+        `## Currently Selected Ticket\n` +
+        `Key: ${t['Issue Key']}\n` +
+        `Summary: ${t.Summary}\n` +
+        `Status: ${t.Status}\n` +
+        `Priority: ${t.Priority}\n` +
+        `Assignee: ${t.Assignee}\n` +
+        `Risk Band: ${t.RiskBand} (score ${t.RiskScore})\n` +
+        `Risk Reasons: ${(t.RiskReasons || []).join(', ')}`
+      )
+    }
+
+    if (prData && !prData.error) {
+      if (prData.prs && prData.prs.length > 0) {
+        const pr = prData.prs[0]
+        parts.push(
+          `## Linked PR\n` +
+          `Title: ${pr.title}\n` +
+          `Status: ${pr.status}\n` +
+          `Author: ${pr.author}\n` +
+          `URL: ${pr.url}`
+        )
+      }
+      if (prData.diff && !prData.diff.error) {
+        const d = prData.diff
+        parts.push(
+          `## PR Diff Summary\n` +
+          `Changed files: ${d.changed_files} | Additions: +${d.additions} | Deletions: -${d.deletions}\n` +
+          `Files:\n` +
+          (d.files || []).map(f => `  ${f.status} ${f.filename} (+${f.additions} -${f.deletions})`).join('\n')
+        )
+        if (d.diff_summary) {
+          parts.push(`## Raw Diff (truncated)\n${d.diff_summary.slice(0, 2000)}`)
+        }
+      }
+      if (prData.description) {
+        parts.push(`## Ticket Description\n${prData.description}`)
+      }
+    }
+
+    return parts.join('\n\n')
+  })()
 
   return (
     <div className="app">

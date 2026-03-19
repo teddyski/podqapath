@@ -66,6 +66,8 @@ def health():
 @app.post("/api/filters")
 def load_filters(req: FiltersRequest):
     _require_jira()
+    if not req.project_key.strip():
+        raise HTTPException(status_code=400, detail="project_key is required")
     try:
         labels   = bridge.fetch_jira_labels(JIRA_URL, JIRA_EMAIL, JIRA_TOKEN, req.project_key)
         statuses = bridge.fetch_jira_statuses(JIRA_URL, JIRA_EMAIL, JIRA_TOKEN, req.project_key)

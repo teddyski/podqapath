@@ -107,6 +107,7 @@ a:hover {
   display: flex;
   flex-direction: column;
   gap: 6px;
+  position: relative;
 }
 
 .sidebar-label {
@@ -227,6 +228,114 @@ a:hover {
 /* =========================================================
    Chips / Filter Tags
    ========================================================= */
+
+/* --- Multi-select Dropdown --- */
+.multiselect-trigger {
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 10px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--text);
+  font-size: 0.85rem;
+  cursor: pointer;
+  text-align: left;
+  transition: border-color 0.15s;
+}
+.multiselect-trigger:hover:not(:disabled) {
+  border-color: var(--accent);
+}
+.multiselect-trigger.multiselect-open {
+  border-color: var(--accent);
+}
+.multiselect-disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+.multiselect-summary {
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.multiselect-arrow {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  margin-left: 6px;
+  flex-shrink: 0;
+}
+.multiselect-dropdown {
+  position: absolute;
+  z-index: 100;
+  width: calc(100% - 32px);
+  max-height: 220px;
+  overflow-y: auto;
+  background: var(--surface);
+  border: 1px solid var(--accent);
+  border-radius: var(--radius);
+  margin-top: 4px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+}
+.multiselect-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  cursor: pointer;
+  font-size: 0.85rem;
+  color: var(--text);
+  transition: background 0.1s;
+}
+.multiselect-option:hover {
+  background: var(--surface-hover);
+}
+.multiselect-option input[type="checkbox"] {
+  accent-color: var(--accent);
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+}
+.multiselect-empty {
+  padding: 10px 12px;
+  color: var(--text-muted);
+  font-size: 0.82rem;
+}
+/* --- Connect form --- */
+.connect-form {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.filters-section {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.sidebar-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  position: relative;
+}
+
+.fetch-btn {
+  margin-top: 4px;
+}
+
+.filters-loaded-badge {
+  font-size: 0.78rem;
+  color: var(--success);
+  margin: 4px 0 8px;
+}
 
 .chip-group {
   display: flex;

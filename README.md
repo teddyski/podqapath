@@ -2,13 +2,13 @@
 
 **An Agentic Release Auditor for Pod-Based QA Teams.**
 
-PodQApath is a Streamlit command center that connects Jira and GitHub through the **Model Context Protocol (MCP)**, scores ticket risk in real time, detects PR collisions across pods, and gives your team an AI-powered QA analyst (QA-7) to drive release readiness decisions.
+PodQApath is a React dashboard backed by a FastAPI server that connects Jira and GitHub through the **Model Context Protocol (MCP)**, scores ticket risk in real time, surfaces PR diffs for any linked pull request, and gives your team an AI-powered QA analyst (QA-7) to drive release readiness decisions.
 
 ---
 
 ## Demo
 
-<video src="https://raw.githubusercontent.com/teddyski/podqapath/main/assets/demo.mp4" controls width="100%"></video>
+> Drag the demo video into a GitHub Issue to get a CDN link, then embed it here.
 
 ---
 
@@ -16,15 +16,11 @@ PodQApath is a Streamlit command center that connects Jira and GitHub through th
 
 | Feature | What it does |
 |---|---|
-| **Risk Scoring** | Every ticket gets a scored risk band — 🔴 Critical / 🟠 High / 🟡 Medium / 🟢 Low — based on priority, days open, PR linkage, and issue type |
-| **QA Payload Audit** | Scans merged PRs from the last N hours and maps them to Jira tickets to show exactly what's deployed in your QA environment |
-| **Collision Detection** | Flags file-level and module-level conflicts across PRs so you know where to focus regression testing |
-| **Not-Yet-Deployed Tracker** | Identifies tickets marked *Ready for QA* whose PRs haven't merged yet — so you don't test code that isn't there |
-| **PR Traceability** | One-click check to verify whether a Jira ticket has a linked pull request |
-| **PR Diff Viewer** | Pulls the full GitHub diff (files changed, additions, deletions) for any selected ticket's PR |
-| **Pod-Aware Filters** | Sidebar filters by pod, status, sprint, and label — with assigned QA member displayed per pod |
-| **QA-7 AI Analyst** | Claude-powered chatbot with two modes: **Technical** (full QA lead analysis) and **Manager** (plain-language summaries). Upgrades to agentic tool-use when MCP is active |
-| **Dual Data Modes** | Switch between **Live MCP/API** (real Jira + GitHub) and **Local CSV Audit** (offline / restricted environments) |
+| **Release-Aware Risk Scoring** | Every ticket is scored 0–100 and bands into 🔴 Critical / 🟠 High / 🟡 Medium / 🟢 Low. Dominant signal: release proximity — ≤2 days +70, ≤7 days +35, ≤14 days +20, ≤21 days +5 |
+| **Smart Filters** | Sidebar lets you filter by Tags, Statuses, and Sprint before fetching — preventing massive ticket loads from hitting the API |
+| **PR Diff Viewer** | Click any ticket to pull its linked GitHub PR: title, status, author, files changed, additions/deletions, and raw diff |
+| **QA-7 AI Analyst** | Claude-powered chatbot with two modes: **Technical** (full QA lead analysis) and **Manager** (plain-language summaries). Automatically receives full context of loaded tickets, selected ticket, and PR diff |
+| **Live Jira + GitHub** | Pulls real Jira tickets and GitHub PR diffs via REST API and MCP — no local CSV needed |
 
 ---
 
@@ -32,11 +28,12 @@ PodQApath is a Streamlit command center that connects Jira and GitHub through th
 
 | Layer | Technology |
 |---|---|
-| UI | Streamlit (Python 3.11+) |
-| AI | Anthropic SDK — Claude claude-sonnet-4-6 |
+| Frontend | React 18 + Vite 5 |
+| Backend | FastAPI (Python 3.11+) |
+| AI | Anthropic SDK — claude-sonnet-4-6 |
 | Protocol | Model Context Protocol (MCP) via `mcp-atlassian` |
 | Integrations | Jira Software, GitHub |
-| Bridge | `mcp_bridge.py` — all data fetching logic |
+| Data Bridge | `mcp_bridge.py` — all data fetching and risk scoring logic |
 
 ---
 
@@ -56,13 +53,21 @@ python3 -m venv .venv
 source .venv/bin/activate
 ```
 
-### 3. Install Dependencies
+### 3. Install Python Dependencies
 
 ```bash
 pip install -r requirements.txt
 ```
 
-### 4. Configure Environment Variables
+### 4. Install Frontend Dependencies
+
+```bash
+cd frontend
+npm install
+cd ..
+```
+
+### 5. Configure Environment Variables
 
 Copy `.env.example` to `.env` and fill in your values:
 
@@ -76,48 +81,77 @@ cp .env.example .env
 | `JIRA_BASE_URL` | ✅ | Your Jira instance URL, e.g. `https://your-org.atlassian.net` |
 | `JIRA_EMAIL` | ✅ | Your Jira account email |
 | `JIRA_API_TOKEN` | ✅ | Jira API token — generate at [id.atlassian.com](https://id.atlassian.com/manage-profile/security/api-tokens) |
-| `JIRA_PROJECT_KEY` | ✅ | Your Jira project key, e.g. `PROJ` |
 | `GITHUB_TOKEN` | ✅ | GitHub personal access token with `repo` (read) scope |
-| `GITHUB_REPO` | ✅ | Target repo in `org/repo-name` format |
-| `POD_FIELD_ID` | Optional | Jira custom field ID for pod mapping (default: `customfield_10020`) |
-| `POD_QA_MAP` | Optional | JSON map of pod names to QA owners (see `.env.example`) |
-| `JIRA_MAX_RESULTS` | Optional | Max tickets to fetch per query (default: `100`) |
-| `GIT_REPO_PATH` | Optional | Local path to your git repo (enables Git MCP server) |
+| `GITHUB_REPO` | Optional | Target repo in `org/repo-name` format |
+| `ANTHROPIC_MODEL` | Optional | Override model (default: `claude-sonnet-4-6`) |
+| `VITE_PROJECT_KEY` | Optional | Default Jira project key pre-filled in the UI |
 
-### 5. Launch the App
+### 6. Start the Backend
 
 ```bash
-streamlit run app.py
+uvicorn main:app --reload --port 8000
 ```
 
-Open [http://localhost:8501](http://localhost:8501) in your browser.
+### 7. Start the Frontend
+
+```bash
+cd frontend
+npm run dev
+```
+
+Open [http://localhost:5173](http://localhost:5173) in your browser.
 
 ---
 
 ## Using the Dashboard
 
-### Local CSV Mode (no credentials needed)
-1. Select **📂 Local CSV Audit** in the sidebar
-2. Upload a Jira export CSV and optionally a Git branch CSV — or click **Load Sample Data** to explore with demo data
+### Connect & Load Filters
+1. Enter your Jira **Project Key** in the sidebar (e.g. `SCRUM`)
+2. Click **Connect & Load Filters** to populate Tags, Statuses, and Sprint dropdowns from your live Jira project
+3. Apply any filters you want, then click **☁️ Fetch Live Data**
 
-### Live Mode (Jira + GitHub)
-1. Select **☁️ Live MCP / Cloud API** in the sidebar
-2. Click **Connect & Load Filters** to populate the sprint, tag, and status dropdowns
-3. Apply filters and click **Fetch Live Data**
-4. Click **🚀 Load QA Payload** to scan recent merged PRs
+### View Ticket Risk
+- Each ticket shows its **Risk Band** (🔴🟠🟡🟢), score, and risk reasons
+- Click any ticket to load its linked PR diff in the center column
 
 ### QA-7 Chatbot
-- Ask anything about your release: risk summaries, collision explanations, deployment status
-- Toggle **Manager mode** for plain-language output suited for non-technical stakeholders
-- When MCP is active, QA-7 can call Jira and GitHub tools directly (agentic mode)
+- Ask anything about your release: risk summaries, what changed in a PR, whether a ticket is ready to ship
+- Toggle **Manager mode** for plain-language output suited for non-technical stakeholders — switching modes clears chat history
+- QA-7 automatically receives full context: all loaded tickets, the selected ticket's details, and the PR diff
+
+---
+
+## Risk Scoring
+
+Scores are 0–100 and clipped. Dominant factor is release proximity:
+
+| Signal | Points |
+|---|---|
+| Release ≤ 2 days | +70 |
+| Release ≤ 7 days | +35 |
+| Release ≤ 14 days | +20 |
+| Release ≤ 21 days | +5 |
+| Critical priority | +30 |
+| High priority | +20 |
+| Medium priority | +10 |
+| Open > 14 days | +10 |
+| No linked PR | +10 |
+| Bug / Incident type | +5 |
+
+| Band | Score |
+|---|---|
+| 🔴 Critical | ≥ 75 |
+| 🟠 High | ≥ 50 |
+| 🟡 Medium | ≥ 25 |
+| 🟢 Low | < 25 |
 
 ---
 
 ## Business Value
 
-PodQApath centralizes deployment data, ticket status, and PR risk into a single command center — reducing triage time and eliminating the "collision risk" common in shared QA environments where multiple pods touch the same codebase simultaneously.
+PodQApath centralizes deployment data, ticket status, and PR risk into a single command center — reducing triage time and eliminating the collision risk common in shared QA environments where multiple pods touch the same codebase simultaneously.
 
-QA-7's Manager mode also bridges the gap between non-technical QA team members and complex engineering work. QA-1 engineers can ask plain-English questions about complex tickets and epics — getting clear explanations of what changed, why it matters, and what to focus on when testing, without needing to read code or parse technical jargon.
+QA-7's Manager mode bridges the gap between non-technical stakeholders and complex engineering work. QA-1 engineers can ask plain-English questions about complex tickets and epics — getting clear explanations of what changed, why it matters, and what to focus on when testing, without needing to read code or parse technical jargon.
 
 ---
 
