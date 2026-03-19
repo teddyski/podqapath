@@ -32,12 +32,10 @@ PodQApath is a React dashboard backed by an **Elixir/Phoenix** server (with a le
 | Layer | Technology |
 |---|---|
 | Frontend | React 18 + Vite 5 |
-| Backend (primary) | Elixir 1.17 / Phoenix 1.7 — `backend/` |
-| Backend (legacy) | FastAPI (Python 3.11+) — `main.py` |
+| Backend | Elixir 1.17 / Phoenix 1.7 — `backend/` |
 | AI | Anthropic API — claude-sonnet-4-6 |
-| Protocol | Model Context Protocol (MCP) via `mcp-atlassian` |
-| Integrations | Jira Software, GitHub |
-| Data Bridge | `mcp_bridge.py` (Python) · `backend/lib/podqapath/` (Elixir) |
+| Integrations | Jira Software, GitHub (direct HTTP via Req) |
+| Legacy Backend | FastAPI (Python 3.11+) — `main.py` / `mcp_bridge.py` |
 
 ---
 
@@ -50,20 +48,7 @@ git clone https://github.com/teddyski/podqapath.git
 cd podqapath
 ```
 
-### 2. Create a Virtual Environment
-
-```bash
-python3 -m venv .venv
-source .venv/bin/activate
-```
-
-### 3. Install Python Dependencies
-
-```bash
-pip install -r requirements.txt
-```
-
-### 4. Install Frontend Dependencies
+### 2. Install Frontend Dependencies
 
 ```bash
 cd frontend
@@ -71,7 +56,7 @@ npm install
 cd ..
 ```
 
-### 5. Configure Environment Variables
+### 3. Configure Environment Variables
 
 Copy `.env.example` to `.env` and fill in your values:
 
@@ -91,7 +76,7 @@ cp .env.example .env
 | `VITE_PROJECT_KEY` | Optional | Default Jira project key pre-filled in the UI |
 | `DEMO_MODE` | Optional | Set to `true` to force all endpoints to return sample data — useful for CI or demos without live credentials |
 
-### 6. Start the Backend
+### 4. Start the Backend
 
 **Elixir/Phoenix (recommended)** — listens on port 4000, reads `.env` automatically:
 
@@ -108,7 +93,7 @@ uvicorn main:app --reload --port 8000
 # then update frontend/vite.config.js proxy target to http://localhost:8000
 ```
 
-### 7. Start the Frontend
+### 5. Start the Frontend
 
 ```bash
 cd frontend
