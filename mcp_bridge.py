@@ -909,7 +909,11 @@ def fetch_jira_sprints(base_url: str, email: str, token: str, project_key: str) 
 # Risk Scoring
 # ---------------------------------------------------------------------------
 
-def compute_risk_scores(jira_df: pd.DataFrame, git_df: pd.DataFrame | None = None) -> pd.DataFrame:
+def compute_risk_scores(
+    jira_df: pd.DataFrame,
+    git_df: pd.DataFrame | None = None,
+    pr_cache: dict | None = None,
+) -> pd.DataFrame:
     df = jira_df.copy()
     priority_map = {"critical": 30, "high": 20, "medium": 10, "low": 5, "unknown": 15}
     df["_p"] = df["Priority"].str.lower().map(priority_map).fillna(15)
@@ -919,6 +923,11 @@ def compute_risk_scores(jira_df: pd.DataFrame, git_df: pd.DataFrame | None = Non
         df["_b"] = df["Issue Key"].apply(lambda k: 0 if k in linked else 25)
     else:
         df["_b"] = 12
+    # Override branch penalty for tickets confirmed to have a PR
+    if pr_cache:
+        df["_b"] = df.apply(
+            lambda r: 0 if pr_cache.get(r["Issue Key"]) is True else r["_b"], axis=1
+        )
     is_bug = df["Issue Type"].str.lower().str.contains("bug", na=False)
     is_core = df["Component"].str.lower().str.contains("core|api", na=False)
     df["_t"] = (is_bug & is_core).map({True: 15, False: 5}).fillna(5)
