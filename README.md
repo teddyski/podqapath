@@ -117,6 +117,8 @@ Open [http://localhost:8501](http://localhost:8501) in your browser.
 
 PodQApath centralizes deployment data, ticket status, and PR risk into a single command center — reducing triage time and eliminating the "collision risk" common in shared QA environments where multiple pods touch the same codebase simultaneously.
 
+QA-7's Manager mode also bridges the gap between non-technical QA team members and complex engineering work. QA-1 engineers can ask plain-English questions about complex tickets and epics — getting clear explanations of what changed, why it matters, and what to focus on when testing, without needing to read code or parse technical jargon.
+
 ---
 
 ## License
