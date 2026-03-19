@@ -31,6 +31,31 @@ defmodule Podqapath.JiraClient do
   end
 
   # ---------------------------------------------------------------------------
+  # Projects
+  # ---------------------------------------------------------------------------
+
+  def fetch_projects do
+    cfg = jira_cfg()
+    req = base_req(cfg.base_url, cfg.email, cfg.token)
+
+    case Req.get(req, url: "/rest/api/3/project", params: [maxResults: 100]) do
+      {:ok, %{status: 200, body: body}} ->
+        projects =
+          body
+          |> Enum.map(fn p -> %{key: p["key"], name: p["name"]} end)
+          |> Enum.sort_by(& &1.name)
+
+        {:ok, projects}
+
+      {:ok, resp} ->
+        {:error, "Project fetch failed: #{resp.status}"}
+
+      {:error, reason} ->
+        {:error, "Project fetch error: #{inspect(reason)}"}
+    end
+  end
+
+  # ---------------------------------------------------------------------------
   # Labels
   # ---------------------------------------------------------------------------
 

@@ -10,6 +10,13 @@ defmodule Podqapath.DemoData do
   # Filters
   # ---------------------------------------------------------------------------
 
+  def projects do
+    [
+      %{key: "DEMO", name: "Demo Project"},
+      %{key: "SCRUM", name: "SCRUM Board"}
+    ]
+  end
+
   def filters do
     %{
       labels: ["auth", "api", "regression", "sprint-critical", "needs-qa", "perf"],

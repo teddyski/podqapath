@@ -13,6 +13,7 @@ defmodule PodqapathWeb.Router do
     options "/*path", ApiController, :options
 
     get  "/health",    ApiController, :health
+    get  "/projects",  ApiController, :projects
     post "/filters",   ApiController, :filters
     post "/tickets",   ApiController, :tickets
     post "/pr-diff",   ApiController, :pr_diff

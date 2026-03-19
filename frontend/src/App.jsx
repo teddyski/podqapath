@@ -8,7 +8,7 @@ import { loadFilters, fetchTickets, fetchPRDiff } from './api'
 
 export default function App() {
   const [projectKey, setProjectKey] = useState(
-    import.meta.env.VITE_PROJECT_KEY || 'SCRUM'
+    import.meta.env.VITE_PROJECT_KEY || ''
   )
   const [filters, setFilters] = useState({ labels: [], statuses: [], sprints: {} })
   const [activeFilters, setActiveFilters] = useState({ tags: [], statuses: [], sprintIds: [] })

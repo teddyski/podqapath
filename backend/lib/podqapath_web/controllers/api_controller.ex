@@ -32,6 +32,27 @@ defmodule PodqapathWeb.ApiController do
   end
 
   # ---------------------------------------------------------------------------
+  # GET /api/projects
+  # ---------------------------------------------------------------------------
+
+  def projects(conn, params) do
+    demo_mode = Map.get(params, "demo_mode", false)
+
+    if is_demo?(demo_mode) do
+      json(conn, DemoData.projects())
+    else
+      unless jira_configured?() do
+        conn |> put_status(503) |> json(%{error: "Jira credentials not configured"}) |> halt()
+      else
+        case JiraClient.fetch_projects() do
+          {:ok, projects} -> json(conn, projects)
+          {:error, reason} -> conn |> put_status(500) |> json(%{error: reason})
+        end
+      end
+    end
+  end
+
+  # ---------------------------------------------------------------------------
   # POST /api/filters
   # ---------------------------------------------------------------------------
 

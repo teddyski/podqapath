@@ -1,5 +1,11 @@
 const BASE = '/api'
 
+export async function fetchProjects(demoMode = false) {
+  const res = await fetch(`${BASE}/projects?demo_mode=${demoMode}`)
+  if (!res.ok) throw new Error(await res.text())
+  return res.json()
+}
+
 export async function loadFilters(projectKey, demoMode = false) {
   const res = await fetch(`${BASE}/filters`, {
     method: 'POST',
