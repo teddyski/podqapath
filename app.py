@@ -85,7 +85,7 @@ defaults = {
     # Live mode filter state
     "_available_tags": [],
     "_available_statuses": [],
-    "_available_sprints": [],
+    "_available_sprints": {},
     "_filters_loaded": False,
     "_filter_tags": [],
     "_filter_statuses": [],
@@ -221,7 +221,7 @@ with st.sidebar:
             placeholder="All statuses", disabled=not st.session_state._filters_loaded,
         )
         st.session_state._filter_sprints = st.multiselect(
-            "Sprint", options=st.session_state._available_sprints, default=_sprint_default,
+            "Sprint", options=list(st.session_state._available_sprints.keys()), default=_sprint_default,
             placeholder="All sprints", disabled=not st.session_state._filters_loaded,
         )
 
@@ -240,8 +240,13 @@ with st.sidebar:
                 statuses_jql = ", ".join(f'"{s}"' for s in st.session_state._filter_statuses)
                 jql_parts.append(f"status in ({statuses_jql})")
             if st.session_state._filter_sprints:
-                sprints_jql = ", ".join(f'"{s}"' for s in st.session_state._filter_sprints)
-                jql_parts.append(f"sprint in ({sprints_jql})")
+                sprints_jql = ", ".join(
+                    str(st.session_state._available_sprints[s])
+                    for s in st.session_state._filter_sprints
+                    if s in st.session_state._available_sprints
+                )
+                if sprints_jql:
+                    jql_parts.append(f"sprint in ({sprints_jql})")
             jql_parts.append("ORDER BY created DESC")
             custom_jql = " AND ".join(jql_parts[:-1]) + " " + jql_parts[-1]
 

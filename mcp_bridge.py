@@ -858,8 +858,11 @@ def fetch_jira_statuses(base_url: str, email: str, token: str, project_key: str)
     return sorted(statuses)
 
 
-def fetch_jira_sprints(base_url: str, email: str, token: str, project_key: str) -> list[str]:
-    """Fetch all sprints (active and closed) for the Jira project."""
+def fetch_jira_sprints(base_url: str, email: str, token: str, project_key: str) -> dict[str, int]:
+    """Fetch all sprints (active and closed) for the Jira project.
+
+    Returns a {name: id} dict so the JQL builder can use integer sprint IDs.
+    """
     import requests
     from requests.auth import HTTPBasicAuth
 
@@ -873,13 +876,13 @@ def fetch_jira_sprints(base_url: str, email: str, token: str, project_key: str) 
         headers=headers, auth=auth, timeout=10,
     )
     if boards_resp.status_code != 200:
-        return []
+        return {}
     boards = boards_resp.json().get("values", [])
     if not boards:
-        return []
+        return {}
 
     board_id = boards[0]["id"]
-    sprints: list[str] = []
+    sprints: dict[str, int] = {}
     start = 0
     while True:
         resp = requests.get(
@@ -892,8 +895,9 @@ def fetch_jira_sprints(base_url: str, email: str, token: str, project_key: str) 
         data = resp.json()
         for sprint in data.get("values", []):
             name = sprint.get("name", "")
-            if name:
-                sprints.append(name)
+            sprint_id = sprint.get("id")
+            if name and sprint_id is not None:
+                sprints[name] = sprint_id
         if data.get("isLast", True):
             break
         start += 50
