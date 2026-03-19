@@ -81,10 +81,19 @@ Always append, never overwrite existing entries.
 ---
 
 ## Code Style
-- Python 3.11+
-- Follow existing Streamlit conventions in app.py
-- Keep MCP bridge logic in mcp_bridge.py, not in app.py
-- Do not commit .env or secrets
+### Elixir/Phoenix Backend
+- Follow Elixir naming conventions (snake_case, descriptive module names)
+- Keep JiraClient and GitClient as separate modules — do not merge into controllers
+- Controllers handle HTTP concerns only, clients handle external API calls
+- Use Port.open for any streaming/SSE endpoints, not System.cmd
+- Pattern match on error tuples {:ok, result} / {:error, reason}
+
+### Frontend (if applicable)
+- [whatever your React/Vite conventions are]
+
+### General
+- Prefer explicit over clever
+- Keep modules small and single-purpose
 
 ## End of Session
 
