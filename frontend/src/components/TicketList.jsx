@@ -10,7 +10,7 @@ export default function TicketList({ tickets, loading, selectedKey, onSelect }) 
   )
 
   return (
-    <div className="ticket-list">
+    <div className="ticket-list" data-testid="ticket-list">
       {tickets.map(t => {
         const key = t['Issue Key']
         const band = t.RiskBand || 'GREEN'
@@ -23,6 +23,7 @@ export default function TicketList({ tickets, loading, selectedKey, onSelect }) 
             key={key}
             className={`ticket-card ${isSelected ? 'ticket-card-selected' : ''}`}
             style={{ borderLeft: `4px solid ${color}` }}
+            data-testid={`ticket-card-${key}`}
           >
             <div className="ticket-card-header">
               <span className="ticket-band-emoji">{BAND_EMOJI[band]}</span>
@@ -40,6 +41,7 @@ export default function TicketList({ tickets, loading, selectedKey, onSelect }) 
             <button
               className={`btn ${isSelected ? 'btn-primary' : 'btn-ghost'} ticket-select-btn`}
               onClick={() => onSelect(t)}
+              data-testid={`ticket-select-btn-${key}`}
             >
               {isSelected ? '✓ Selected' : 'Select'}
             </button>

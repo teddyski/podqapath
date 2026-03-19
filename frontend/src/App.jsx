@@ -3,7 +3,7 @@ import Sidebar from './components/Sidebar'
 import TicketList from './components/TicketList'
 import PRDiffViewer from './components/PRDiffViewer'
 import ChatPanel from './components/ChatPanel'
-import { fetchTickets, fetchPRDiff } from './api'
+import { loadFilters, fetchTickets, fetchPRDiff } from './api'
 
 export default function App() {
   const [projectKey, setProjectKey] = useState(
@@ -17,6 +17,8 @@ export default function App() {
   const [selectedTicket, setSelectedTicket] = useState(null)
   const [prData, setPrData] = useState(null)
   const [loadingPR, setLoadingPR] = useState(false)
+  const [demoMode, setDemoMode] = useState(false)
+  const [testResults, setTestResults] = useState('')
 
   const handleFetchTickets = useCallback(async () => {
     setLoadingTickets(true)
@@ -27,6 +29,7 @@ export default function App() {
         tags: activeFilters.tags,
         statuses: activeFilters.statuses,
         sprintIds: activeFilters.sprintIds,
+        demoMode,
       })
       setTickets(data)
     } catch (e) {
@@ -34,19 +37,43 @@ export default function App() {
     } finally {
       setLoadingTickets(false)
     }
-  }, [projectKey, activeFilters])
+  }, [projectKey, activeFilters, demoMode])
 
   const handleSelectTicket = useCallback(async (ticket) => {
     setSelectedTicket(ticket)
     setPrData(null)
     setLoadingPR(true)
     try {
-      const data = await fetchPRDiff(ticket['Issue Key'])
+      const data = await fetchPRDiff(ticket['Issue Key'], demoMode)
       setPrData(data)
     } catch (e) {
       setPrData({ error: e.message })
     } finally {
       setLoadingPR(false)
+    }
+  }, [demoMode])
+
+  const handleLoadDemo = useCallback(async () => {
+    setDemoMode(true)
+    setTicketError('')
+    try {
+      const filterData = await loadFilters('DEMO', true)
+      setFilters(filterData)
+      setActiveFilters({ tags: [], statuses: [], sprintIds: [] })
+      setSelectedTicket(null)
+      setPrData(null)
+    } catch (e) {
+      setTicketError(e.message)
+      return
+    }
+    setLoadingTickets(true)
+    try {
+      const data = await fetchTickets({ projectKey: 'DEMO', demoMode: true })
+      setTickets(data)
+    } catch (e) {
+      setTicketError(e.message)
+    } finally {
+      setLoadingTickets(false)
     }
   }, [])
 
@@ -105,11 +132,15 @@ export default function App() {
       }
     }
 
+    if (testResults) {
+      parts.push(`## Latest Test Run\n${testResults}`)
+    }
+
     return parts.join('\n\n')
   })()
 
   return (
-    <div className="app">
+    <div className="app" data-testid="app">
       <Sidebar
         projectKey={projectKey}
         onProjectKeyChange={setProjectKey}
@@ -118,6 +149,8 @@ export default function App() {
         activeFilters={activeFilters}
         onActiveFiltersChange={setActiveFilters}
         onFetchTickets={handleFetchTickets}
+        onLoadDemo={handleLoadDemo}
+        onTestResultsUpdate={setTestResults}
         loading={loadingTickets}
       />
       <main className="main-grid">

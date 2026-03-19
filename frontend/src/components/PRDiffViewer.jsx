@@ -4,30 +4,30 @@ export default function PRDiffViewer({ ticket, data, loading }) {
   const [diffOpen, setDiffOpen] = useState(false)
 
   if (!ticket) return (
-    <div className="state-msg">Select a ticket to view its PR diff.</div>
+    <div className="state-msg" data-testid="pr-viewer-empty">Select a ticket to view its PR diff.</div>
   )
 
-  if (loading) return <div className="state-msg">Loading PR data…</div>
+  if (loading) return <div className="state-msg" data-testid="pr-viewer-loading">Loading PR data…</div>
 
-  if (!data) return <div className="state-msg">No PR data.</div>
+  if (!data) return <div className="state-msg" data-testid="pr-viewer-empty">No PR data.</div>
 
-  if (data.error) return <div className="error-banner">{data.error}</div>
+  if (data.error) return <div className="error-banner" data-testid="pr-viewer-error">{data.error}</div>
 
   if (!data.prs || data.prs.length === 0) return (
-    <div className="state-msg">No pull requests linked to <strong>{ticket['Issue Key']}</strong>.</div>
+    <div className="state-msg" data-testid="pr-viewer-no-prs">No pull requests linked to <strong>{ticket['Issue Key']}</strong>.</div>
   )
 
   const diff = data.diff
 
   return (
-    <div className="pr-viewer">
+    <div className="pr-viewer" data-testid="pr-viewer">
       <div className="pr-viewer-ticket">
         <span className="ticket-key">{ticket['Issue Key']}</span> — {ticket.Summary}
       </div>
 
-      <div className="pr-list">
+      <div className="pr-list" data-testid="pr-list">
         {data.prs.map((pr, i) => (
-          <div key={i} className="pr-row">
+          <div key={i} className="pr-row" data-testid={`pr-row-${i}`}>
             <span className={`pr-status-badge pr-${pr.status?.toLowerCase()}`}>{pr.status}</span>
             <a href={pr.url} target="_blank" rel="noreferrer" className="pr-link">
               {pr.title || pr.url}
@@ -39,7 +39,7 @@ export default function PRDiffViewer({ ticket, data, loading }) {
 
       {diff && !diff.error && (
         <>
-          <div className="diff-metrics">
+          <div className="diff-metrics" data-testid="diff-metrics">
             <div className="diff-metric">
               <span className="diff-metric-value">{diff.changed_files}</span>
               <span className="diff-metric-label">files</span>
@@ -55,7 +55,7 @@ export default function PRDiffViewer({ ticket, data, loading }) {
           </div>
 
           {diff.files && diff.files.length > 0 && (
-            <table className="diff-table">
+            <table className="diff-table" data-testid="diff-table">
               <thead>
                 <tr><th>File</th><th>Status</th><th>+</th><th>-</th></tr>
               </thead>
@@ -74,11 +74,15 @@ export default function PRDiffViewer({ ticket, data, loading }) {
 
           {diff.diff_summary && (
             <div className="diff-expander">
-              <button className="btn btn-ghost" onClick={() => setDiffOpen(o => !o)}>
+              <button
+                className="btn btn-ghost"
+                onClick={() => setDiffOpen(o => !o)}
+                data-testid="raw-diff-toggle"
+              >
                 {diffOpen ? '▲ Hide raw diff' : '▼ View raw diff'}
               </button>
               {diffOpen && (
-                <pre className="diff-raw">{diff.diff_summary}</pre>
+                <pre className="diff-raw" data-testid="raw-diff-content">{diff.diff_summary}</pre>
               )}
             </div>
           )}

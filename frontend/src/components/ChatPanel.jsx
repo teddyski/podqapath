@@ -46,7 +46,7 @@ export default function ChatPanel({ context }) {
   }
 
   return (
-    <div className="chat-panel">
+    <div className="chat-panel" data-testid="chat-panel">
       <div className="chat-mode-bar">
         <label className="toggle-label">
           <input
@@ -54,6 +54,7 @@ export default function ChatPanel({ context }) {
             checked={managerMode}
             onChange={e => { setManagerMode(e.target.checked); setHistory([]) }}
             className="toggle-input"
+            data-testid="manager-mode-toggle"
           />
           <span className="toggle-track" />
           <span className="toggle-text">
@@ -62,25 +63,25 @@ export default function ChatPanel({ context }) {
         </label>
       </div>
 
-      <div className="chat-messages">
+      <div className="chat-messages" data-testid="chat-messages">
         {history.length === 0 && (
           <div className="chat-empty">
             Ask QA-7 anything about your release — risk, tickets, collisions, or readiness.
           </div>
         )}
         {history.map((m, i) => (
-          <div key={i} className={`chat-msg chat-msg-${m.role}`}>
+          <div key={i} className={`chat-msg chat-msg-${m.role}`} data-testid={`chat-msg-${i}`}>
             <span className="chat-msg-role">{m.role === 'user' ? 'You' : 'QA-7'}</span>
             <div className="chat-msg-content">{m.content}</div>
           </div>
         ))}
         {loading && (
-          <div className="chat-msg chat-msg-assistant">
+          <div className="chat-msg chat-msg-assistant" data-testid="chat-thinking">
             <span className="chat-msg-role">QA-7</span>
             <div className="chat-msg-content chat-thinking">Thinking…</div>
           </div>
         )}
-        {error && <div className="error-banner">{error}</div>}
+        {error && <div className="error-banner" data-testid="chat-error">{error}</div>}
         <div ref={bottomRef} />
       </div>
 
@@ -93,8 +94,14 @@ export default function ChatPanel({ context }) {
           placeholder="Ask QA-7… (Enter to send)"
           rows={2}
           disabled={loading}
+          data-testid="chat-input"
         />
-        <button className="btn btn-primary chat-send" onClick={handleSend} disabled={loading || !input.trim()}>
+        <button
+          className="btn btn-primary chat-send"
+          onClick={handleSend}
+          disabled={loading || !input.trim()}
+          data-testid="chat-send-btn"
+        >
           Send
         </button>
       </div>
