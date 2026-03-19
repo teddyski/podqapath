@@ -8,7 +8,7 @@ PodQApath is a Streamlit command center that connects Jira and GitHub through th
 
 ## Demo
 
-<video src="assets/demo.mp4" controls width="100%"></video>
+<video src="https://raw.githubusercontent.com/teddyski/podqapath/main/assets/demo.mp4" controls width="100%"></video>
 
 ---
 
