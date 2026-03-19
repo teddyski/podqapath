@@ -149,7 +149,7 @@ def fetch_jira_via_mcp(jira_url: str, email: str, token: str,
         )
 
     jql = jql_override if jql_override else f"project = {project_key} ORDER BY created DESC"
-    result = call_mcp_tool(params, search_tool, {"jql": jql, "max_results": max_results})
+    result = call_mcp_tool(params, search_tool, {"jql": jql})
     raw = _extract_text(result)
 
     # mcp-atlassian returns markdown or JSON — try JSON first
@@ -426,76 +426,75 @@ def generate_sample_git_df() -> pd.DataFrame:
 def fetch_dev_status(base_url: str, email: str, token: str, issue_key: str) -> dict:
     """
     Retrieve PR links for a Jira ticket via the dev-status REST API.
-    Returns:
-        {
-          "issue_id": str,
-          "description": str,
-          "has_pr": bool,
-          "prs": [{"title", "url", "status", "author", "source_branch",
-                   "destination_branch", "app_type"}, ...]
-        }
-    Raises on auth failure or missing ticket; returns empty prs list if no PRs found.
+    Always returns a dict with keys: has_pr (bool), prs (list), description (str).
+    Never raises — returns the safe fallback on any error.
     """
-    import requests
-    from requests.auth import HTTPBasicAuth
+    _fallback: dict = {"has_pr": False, "prs": [], "description": ""}
 
-    auth = HTTPBasicAuth(email, token)
-    headers = {"Accept": "application/json"}
-    base = base_url.rstrip("/")
+    try:
+        import requests
+        from requests.auth import HTTPBasicAuth
 
-    # Step 1 — get numeric issue ID + description
-    issue_resp = requests.get(
-        f"{base}/rest/api/3/issue/{issue_key}",
-        params={"fields": "id,summary,description"},
-        headers=headers, auth=auth, timeout=10,
-    )
-    issue_resp.raise_for_status()
-    issue_data = issue_resp.json()
-    issue_id = issue_data["id"]
-    description = _extract_adf(issue_data.get("fields", {}).get("description"))
+        auth = HTTPBasicAuth(email, token)
+        headers = {"Accept": "application/json"}
+        base = base_url.rstrip("/")
 
-    # Step 2 — dev-status summary (check PR count)
-    summary_resp = requests.get(
-        f"{base}/rest/dev-status/1.0/issue/summary",
-        params={"issueId": issue_id},
-        headers=headers, auth=auth, timeout=10,
-    )
-    if summary_resp.status_code != 200:
-        return {"issue_id": issue_id, "description": description, "has_pr": False, "prs": []}
-
-    pr_count = (
-        summary_resp.json()
-        .get("summary", {})
-        .get("pullrequest", {})
-        .get("overall", {})
-        .get("count", 0)
-    )
-    if pr_count == 0:
-        return {"issue_id": issue_id, "description": description, "has_pr": False, "prs": []}
-
-    # Step 3 — get PR details, try known application types
-    prs = []
-    for app_type in ["GitHub", "GitHub Enterprise", "Bitbucket", "GitLab", "Bitbucket Server"]:
-        detail_resp = requests.get(
-            f"{base}/rest/dev-status/1.0/issue/detail",
-            params={"issueId": issue_id, "applicationType": app_type, "dataType": "pullrequest"},
+        # Step 1 — get numeric issue ID + description
+        issue_resp = requests.get(
+            f"{base}/rest/api/3/issue/{issue_key}",
+            params={"fields": "id,summary,description"},
             headers=headers, auth=auth, timeout=10,
         )
-        if detail_resp.status_code != 200:
-            continue
-        for repo in detail_resp.json().get("detail", []):
-            for pr in repo.get("pullRequests", []):
-                prs.append({
-                    "title":              pr.get("name", ""),
-                    "url":                pr.get("url", ""),
-                    "status":             pr.get("status", "UNKNOWN"),
-                    "author":             (pr.get("author") or {}).get("name", ""),
-                    "source_branch":      (pr.get("source") or {}).get("branch", {}).get("name", ""),
-                    "destination_branch": (pr.get("destination") or {}).get("branch", {}).get("name", ""),
-                    "app_type":           app_type,
-                })
+        issue_resp.raise_for_status()
+        issue_data = issue_resp.json()
+        issue_id = issue_data["id"]
+        description = _extract_adf(issue_data.get("fields", {}).get("description"))
 
-    return {"issue_id": issue_id, "description": description, "has_pr": bool(prs), "prs": prs}
+        # Step 2 — dev-status summary (check PR count)
+        summary_resp = requests.get(
+            f"{base}/rest/dev-status/1.0/issue/summary",
+            params={"issueId": issue_id},
+            headers=headers, auth=auth, timeout=10,
+        )
+        if summary_resp.status_code != 200:
+            return {"has_pr": False, "prs": [], "description": description}
+
+        pr_count = (
+            summary_resp.json()
+            .get("summary", {})
+            .get("pullrequest", {})
+            .get("overall", {})
+            .get("count", 0)
+        )
+        if pr_count == 0:
+            return {"has_pr": False, "prs": [], "description": description}
+
+        # Step 3 — get PR details, try known application types
+        prs = []
+        for app_type in ["GitHub", "GitHub Enterprise", "Bitbucket", "GitLab", "Bitbucket Server"]:
+            detail_resp = requests.get(
+                f"{base}/rest/dev-status/1.0/issue/detail",
+                params={"issueId": issue_id, "applicationType": app_type, "dataType": "pullrequest"},
+                headers=headers, auth=auth, timeout=10,
+            )
+            if detail_resp.status_code != 200:
+                continue
+            for repo in detail_resp.json().get("detail", []):
+                for pr in repo.get("pullRequests", []):
+                    prs.append({
+                        "title":              pr.get("name", ""),
+                        "url":                pr.get("url", ""),
+                        "status":             pr.get("status", "UNKNOWN"),
+                        "author":             (pr.get("author") or {}).get("name", ""),
+                        "source_branch":      (pr.get("source") or {}).get("branch", {}).get("name", ""),
+                        "destination_branch": (pr.get("destination") or {}).get("branch", {}).get("name", ""),
+                        "app_type":           app_type,
+                    })
+
+        return {"has_pr": bool(prs), "prs": prs, "description": description}
+
+    except Exception:
+        return _fallback
 
 
 def _extract_adf(adf) -> str:
@@ -924,6 +923,30 @@ def compute_risk_scores(jira_df: pd.DataFrame, git_df: pd.DataFrame | None = Non
     df["_u"] = df["Assignee"].str.lower().apply(lambda a: 10 if "unassigned" in a else 0)
     df["RiskScore"] = (df["_p"] + df["_a"] + df["_b"] + df["_t"] + df["_u"]).clip(0, 100).astype(int)
     df["RiskBand"] = df["RiskScore"].apply(_score_to_band)
+
+    def _reasons(row):
+        reasons = []
+        p = row["Priority"].lower()
+        if p == "critical":
+            reasons.append("Critical priority")
+        elif p == "high":
+            reasons.append("High priority")
+        d = row["Days Open"]
+        if d > 14:
+            reasons.append(f"Open {int(d)} days")
+        elif d > 7:
+            reasons.append(f"Open {int(d)} days")
+        if row["_b"] == 25:
+            reasons.append("No linked branch")
+        elif row["_b"] == 12:
+            reasons.append("Branch link unknown")
+        if row["_t"] == 15:
+            reasons.append("Bug in core/API")
+        if row["_u"] == 10:
+            reasons.append("Unassigned")
+        return reasons
+
+    df["RiskReasons"] = df.apply(_reasons, axis=1)
     return df.drop(columns=["_p", "_a", "_b", "_t", "_u"])
 
 

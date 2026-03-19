@@ -415,41 +415,63 @@ with col1:
                       else "—"
         )
 
-        filter_band = st.multiselect(
-            "Filter by Risk Band",
-            options=["RED", "ORANGE", "YELLOW", "GREEN"],
-            default=["RED", "ORANGE", "YELLOW", "GREEN"],
-            key="band_filter",
-        )
-        display_df = df_scored[df_scored["RiskBand"].isin(filter_band)].reset_index(drop=True)
+        display_df = df_scored.reset_index(drop=True)
 
         BAND_EMOJI = {"RED": "🔴", "ORANGE": "🟠", "YELLOW": "🟡", "GREEN": "🟢"}
+        BAND_LABEL = {
+            "RED":    ("🔴 Critical risk", "Score 81–100 — needs attention before release"),
+            "ORANGE": ("🟠 High risk",     "Score 61–80 — review carefully"),
+            "YELLOW": ("🟡 Medium risk",   "Score 31–60 — monitor closely"),
+            "GREEN":  ("🟢 Low risk",      "Score 0–30 — looking good"),
+        }
 
-        # Card grid — 2 per row
-        card_rows = [display_df.iloc[i:i + 2] for i in range(0, len(display_df), 2)]
-        for row_chunk in card_rows:
-            card_cols = st.columns(2)
-            for col, (_, card_row) in zip(card_cols, row_chunk.iterrows()):
-                c_key    = card_row["Issue Key"]
-                band     = card_row["RiskBand"]
-                status   = card_row["Status"]
-                pr_icon  = card_row["PR"]
-                selected = st.session_state.selected_ticket_key == c_key
-                with col:
-                    with st.container(border=True):
-                        st.markdown(f"{BAND_EMOJI.get(band, '⚪')} **{c_key}** {pr_icon}")
-                        st.caption(status)
-                        if st.button(
-                            "✓ Selected" if selected else "Select",
-                            key=f"card_{c_key}",
-                            use_container_width=True,
-                            type="primary" if selected else "secondary",
-                        ):
-                            if st.session_state.selected_ticket_key != c_key:
-                                st.session_state.selected_ticket_key = c_key
-                                st.session_state.dev_status_data     = None
-                                st.session_state.pr_diff_data        = None
-                            st.rerun()
+        with st.expander("Risk score guide", expanded=False):
+            for band in ["RED", "ORANGE", "YELLOW", "GREEN"]:
+                label, desc = BAND_LABEL[band]
+                st.markdown(f"**{label}** — {desc}")
+            st.caption(
+                "Score factors: priority (+5–30), days open (+0–20), "
+                "no linked branch (+25), bug in core/API (+15), unassigned (+10)"
+            )
+
+        # Card list — full width, stacked
+        for _, card_row in display_df.iterrows():
+            c_key    = card_row["Issue Key"]
+            band     = card_row["RiskBand"]
+            score    = card_row["RiskScore"]
+            status   = card_row["Status"]
+            pr_icon  = card_row["PR"]
+            reasons  = card_row.get("RiskReasons") or []
+            selected = st.session_state.selected_ticket_key == c_key
+            with st.container(border=True):
+                summary = str(card_row.get("Summary", ""))
+                summary_short = summary[:55] + "…" if len(summary) > 55 else summary
+                jira_base = st.session_state.get("_jira_base_url", "").rstrip("/")
+                if jira_base:
+                    key_html = f'<a href="{jira_base}/browse/{c_key}" target="_blank" style="text-decoration:none;">{c_key}</a>'
+                else:
+                    key_html = f"<strong>{c_key}</strong>"
+                band_label, _ = BAND_LABEL.get(band, (f"{BAND_EMOJI.get(band,'⚪')} {band}", ""))
+                reasons_str = " · ".join(reasons) if reasons else "No risk flags"
+                st.markdown(
+                    f"{BAND_EMOJI.get(band, '⚪')} {key_html} {pr_icon} "
+                    f"<span style='font-size:0.8em;color:gray;'>score {score}</span><br>"
+                    f"<span style='font-size:0.9em;font-weight:600;'>{summary_short}</span><br>"
+                    f"<span style='font-size:0.78em;color:gray;'>Why: {reasons_str}</span>",
+                    unsafe_allow_html=True,
+                )
+                st.caption(status)
+                if st.button(
+                    "✓ Selected" if selected else "Select",
+                    key=f"card_{c_key}",
+                    use_container_width=True,
+                    type="primary" if selected else "secondary",
+                ):
+                    if st.session_state.selected_ticket_key != c_key:
+                        st.session_state.selected_ticket_key = c_key
+                        st.session_state.dev_status_data     = None
+                        st.session_state.pr_diff_data        = None
+                    st.rerun()
 
         red_count = int((df_scored["RiskBand"] == "RED").sum())
         if red_count >= 3:
