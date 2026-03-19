@@ -1,7 +1,7 @@
 const BAND_COLOR = { RED: '#ff4b4b', ORANGE: '#ff8c00', YELLOW: '#ffd700', GREEN: '#21c354' }
 const BAND_EMOJI = { RED: '🔴', ORANGE: '🟠', YELLOW: '🟡', GREEN: '🟢' }
 
-export default function TicketList({ tickets, loading, selectedKey, onSelect }) {
+export default function TicketList({ tickets, loading, selectedKey, onSelect, onTest }) {
   if (loading) return <div className="state-msg">Loading tickets…</div>
   if (!tickets.length) return (
     <div className="state-msg">
@@ -38,13 +38,23 @@ export default function TicketList({ tickets, loading, selectedKey, onSelect }) 
             {reasons.length > 0 && (
               <div className="ticket-reasons">Why: {reasons.join(' · ')}</div>
             )}
-            <button
-              className={`btn ${isSelected ? 'btn-primary' : 'btn-ghost'} ticket-select-btn`}
-              onClick={() => onSelect(t)}
-              data-testid={`ticket-select-btn-${key}`}
-            >
-              {isSelected ? '✓ Selected' : 'Select'}
-            </button>
+            <div className="ticket-actions">
+              <button
+                className={`btn ${isSelected ? 'btn-primary' : 'btn-ghost'} ticket-select-btn`}
+                onClick={() => onSelect(t)}
+                data-testid={`ticket-select-btn-${key}`}
+              >
+                {isSelected ? '✓ Selected' : 'Select'}
+              </button>
+              <button
+                className="btn btn-ghost ticket-test-btn"
+                onClick={() => onTest(t)}
+                data-testid={`ticket-test-btn-${key}`}
+                title="Load PR diff and run tests"
+              >
+                ▶ Test
+              </button>
+            </div>
           </div>
         )
       })}

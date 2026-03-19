@@ -231,29 +231,74 @@ async def run_tests(req: RunTestsRequest):
             yield f"data: {json.dumps({'type': 'error', 'message': f'Path not found: {work_dir}'})}\n\n"
             return
 
-        # Locate Playwright config
-        config_file = next(
-            (n for n in ["playwright.config.js", "playwright.config.ts", "playwright.config.mjs"]
-             if (Path(work_dir) / n).exists()),
-            None,
-        )
-        if not config_file:
-            yield f"data: {json.dumps({'type': 'error', 'message': 'No Playwright config found in repo root.'})}\n\n"
+        # Locate Playwright config — search root then up to 2 levels deep
+        config_names = ["playwright.config.js", "playwright.config.ts", "playwright.config.mjs"]
+        config_path: Path | None = None
+        for p in [Path(work_dir)] + sorted(Path(work_dir).rglob("playwright.config.*"))[:20]:
+            if p.is_file() and p.name in config_names:
+                config_path = p
+                break
+            if p.is_dir():
+                for name in config_names:
+                    candidate = p / name
+                    if candidate.exists():
+                        config_path = candidate
+                        break
+            if config_path:
+                break
+
+        if not config_path:
+            yield f"data: {json.dumps({'type': 'error', 'message': 'No Playwright config found in repo.'})}\n\n"
             if tmp_dir:
                 shutil.rmtree(tmp_dir, ignore_errors=True)
             return
 
-        yield f"data: {json.dumps({'type': 'start', 'config': config_file})}\n\n"
+        config_cwd = str(config_path.parent)
+        yield f"data: {json.dumps({'type': 'start', 'config': str(config_path.relative_to(work_dir))})}\n\n"
 
         env = {**os.environ, "PLAYWRIGHT_FORCE_TTY": "0", "CI": "1"}
+
+        # Install dependencies if node_modules is missing (e.g. fresh clone)
+        if not (Path(config_cwd) / "node_modules").exists():
+            yield f"data: {json.dumps({'type': 'output', 'text': '📦 Installing dependencies…'})}\n\n"
+            install_proc = await asyncio.create_subprocess_exec(
+                "npm", "install", "--prefer-offline",
+                cwd=config_cwd, env=env,
+                stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.STDOUT,
+            )
+            try:
+                await asyncio.wait_for(install_proc.wait(), timeout=120)
+            except asyncio.TimeoutError:
+                yield f"data: {json.dumps({'type': 'error', 'message': 'npm install timed out after 120s.'})}\n\n"
+                if tmp_dir:
+                    shutil.rmtree(tmp_dir, ignore_errors=True)
+                return
+            if install_proc.returncode != 0:
+                yield f"data: {json.dumps({'type': 'error', 'message': 'npm install failed.'})}\n\n"
+                if tmp_dir:
+                    shutil.rmtree(tmp_dir, ignore_errors=True)
+                return
+            # Install Playwright browsers if needed
+            browser_proc = await asyncio.create_subprocess_exec(
+                str(Path(config_cwd) / "node_modules" / ".bin" / "playwright"),
+                "install", "--with-deps",
+                cwd=config_cwd, env=env,
+                stdout=asyncio.subprocess.DEVNULL, stderr=asyncio.subprocess.DEVNULL,
+            )
+            await browser_proc.wait()
+
         if req.base_url.strip():
             env["BASE_URL"] = req.base_url.strip()
+
+        # Always use the local playwright binary and explicit config to avoid version mismatches
+        pw_bin = str(Path(config_cwd) / "node_modules" / ".bin" / "playwright")
+        pw_config = str(config_path)
 
         # Phase 1 — discover tests so the frontend can show ⬜ pending states
         try:
             list_proc = await asyncio.create_subprocess_exec(
-                "npx", "playwright", "test", "--list",
-                cwd=work_dir, env=env,
+                pw_bin, "test", "--config", pw_config, "--list",
+                cwd=config_cwd, env=env,
                 stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE,
             )
             list_out, _ = await asyncio.wait_for(list_proc.communicate(), timeout=30)
@@ -266,8 +311,8 @@ async def run_tests(req: RunTestsRequest):
 
         # Phase 2 — run the suite and stream results
         proc = await asyncio.create_subprocess_exec(
-            "npx", "playwright", "test", "--reporter=list",
-            cwd=work_dir, env=env,
+            pw_bin, "test", "--config", pw_config, "--reporter=list",
+            cwd=config_cwd, env=env,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.STDOUT,
         )

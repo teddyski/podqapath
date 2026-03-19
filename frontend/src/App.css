@@ -467,9 +467,17 @@ a:hover {
   line-height: 1.4;
 }
 
-.ticket-select-btn {
+.ticket-actions {
+  display: flex;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.ticket-select-btn,
+.ticket-test-btn {
   font-size: 12px;
   padding: 4px 12px;
+  flex: 1;
 }
 
 /* =========================================================
@@ -949,6 +957,26 @@ a:hover {
 
 .test-runner-header:hover {
   background: var(--surface-hover);
+}
+
+.test-runner-header-static {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  background: var(--surface);
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.2px;
+  border-radius: 4px 4px 0 0;
+}
+
+.test-runner-running-badge {
+  font-size: 10px;
+  color: var(--text-muted);
+  font-weight: 400;
+  animation: pulse 1.2s ease-in-out infinite;
 }
 
 .test-runner-body {

@@ -2,6 +2,7 @@ import { useState, useCallback } from 'react'
 import Sidebar from './components/Sidebar'
 import TicketList from './components/TicketList'
 import PRDiffViewer from './components/PRDiffViewer'
+import TestRunner from './components/TestRunner'
 import ChatPanel from './components/ChatPanel'
 import { loadFilters, fetchTickets, fetchPRDiff } from './api'
 
@@ -19,6 +20,7 @@ export default function App() {
   const [loadingPR, setLoadingPR] = useState(false)
   const [demoMode, setDemoMode] = useState(false)
   const [testResults, setTestResults] = useState('')
+  const [autoRunTest, setAutoRunTest] = useState(false)
 
   const handleFetchTickets = useCallback(async () => {
     setLoadingTickets(true)
@@ -52,6 +54,11 @@ export default function App() {
       setLoadingPR(false)
     }
   }, [demoMode])
+
+  const handleTestTicket = useCallback((ticket) => {
+    setAutoRunTest(true)
+    handleSelectTicket(ticket)
+  }, [handleSelectTicket])
 
   const handleLoadDemo = useCallback(async () => {
     setDemoMode(true)
@@ -150,7 +157,6 @@ export default function App() {
         onActiveFiltersChange={setActiveFilters}
         onFetchTickets={handleFetchTickets}
         onLoadDemo={handleLoadDemo}
-        onTestResultsUpdate={setTestResults}
         loading={loadingTickets}
       />
       <main className="main-grid">
@@ -162,6 +168,7 @@ export default function App() {
             loading={loadingTickets}
             selectedKey={selectedTicket?.['Issue Key']}
             onSelect={handleSelectTicket}
+            onTest={handleTestTicket}
           />
         </section>
         <section className="col col-diff">
@@ -170,6 +177,12 @@ export default function App() {
             ticket={selectedTicket}
             data={prData}
             loading={loadingPR}
+          />
+          <TestRunner
+            prData={prData}
+            autoRunTest={autoRunTest}
+            onClearAutoRun={() => setAutoRunTest(false)}
+            onResultsUpdate={setTestResults}
           />
         </section>
         <section className="col col-chat">

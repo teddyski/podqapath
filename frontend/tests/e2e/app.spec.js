@@ -135,30 +135,19 @@ test.describe('Chat panel', () => {
 })
 
 test.describe('Repo Test Runner panel', () => {
-  test('panel is collapsed by default and expands on click', async ({ page }) => {
+  test('panel is visible by default with all inputs', async ({ page }) => {
     await page.goto('/')
 
-    const toggle = page.locator('[data-testid="test-runner-toggle"]')
-    await expect(toggle).toBeVisible()
-
-    // Body hidden initially
-    await expect(page.locator('[data-testid="test-runner-repo-path"]')).not.toBeVisible()
-
-    // Expand
-    await toggle.click()
+    // Panel and inputs always visible (no collapse in main content area)
+    await expect(page.locator('[data-testid="test-runner"]')).toBeVisible()
     await expect(page.locator('[data-testid="test-runner-repo-path"]')).toBeVisible()
     await expect(page.locator('[data-testid="test-runner-repo-url"]')).toBeVisible()
     await expect(page.locator('[data-testid="test-runner-base-url"]')).toBeVisible()
     await expect(page.locator('[data-testid="test-runner-run-btn"]')).toBeVisible()
-
-    // Collapse
-    await toggle.click()
-    await expect(page.locator('[data-testid="test-runner-repo-path"]')).not.toBeVisible()
   })
 
   test('shows error when Run Tests is clicked with no inputs', async ({ page }) => {
     await page.goto('/')
-    await page.click('[data-testid="test-runner-toggle"]')
     await page.click('[data-testid="test-runner-run-btn"]')
 
     await expect(page.locator('[data-testid="test-runner-error"]')).toBeVisible()
@@ -167,7 +156,6 @@ test.describe('Repo Test Runner panel', () => {
 
   test('runs the PodQApath Playwright suite and streams results', async ({ page }) => {
     await page.goto('/')
-    await page.click('[data-testid="test-runner-toggle"]')
 
     // Run PodQApath's own tests — guaranteed to have playwright.config.js
     const frontendDir = process.cwd()

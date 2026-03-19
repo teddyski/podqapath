@@ -1,7 +1,6 @@
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useCallback } from 'react'
 
-export default function TestRunner({ onResultsUpdate }) {
-  const [open, setOpen] = useState(false)
+export default function TestRunner({ prData, autoRunTest, onClearAutoRun, onResultsUpdate }) {
   const [repoPath, setRepoPath] = useState('')
   const [repoUrl, setRepoUrl] = useState('')
   const [baseUrl, setBaseUrl] = useState('http://localhost:3000')
@@ -20,8 +19,11 @@ export default function TestRunner({ onResultsUpdate }) {
     }
   }, [tests, rawLines])
 
-  async function handleRun() {
-    if (!repoPath.trim() && !repoUrl.trim()) {
+  const handleRun = useCallback(async (overrideUrl = null) => {
+    const urlToUse = overrideUrl !== null ? overrideUrl : repoUrl.trim()
+    const pathToUse = overrideUrl !== null ? '' : repoPath.trim()
+
+    if (!pathToUse && !urlToUse) {
       setError('Enter a repo path or GitHub URL')
       return
     }
@@ -38,8 +40,8 @@ export default function TestRunner({ onResultsUpdate }) {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          repo_path: repoPath.trim(),
-          repo_url: repoUrl.trim(),
+          repo_path: pathToUse,
+          repo_url: urlToUse,
           base_url: baseUrl.trim() || 'http://localhost:3000',
         }),
       })
@@ -77,7 +79,21 @@ export default function TestRunner({ onResultsUpdate }) {
     } finally {
       setRunning(false)
     }
-  }
+  }, [repoPath, repoUrl, baseUrl, onResultsUpdate])
+
+  // Auto-run only when the ▶ Test button was clicked and prData has arrived
+  useEffect(() => {
+    if (!autoRunTest || !prData) return
+    const prUrl = prData?.prs?.[0]?.url || ''
+    if (!prUrl.includes('github.com')) return
+    const m = prUrl.match(/^(https:\/\/github\.com\/[^/]+\/[^/]+)/)
+    if (!m) return
+    onClearAutoRun?.()
+    const repoBase = m[1]
+    setRepoUrl(repoBase)
+    setRepoPath('')
+    handleRun(repoBase)
+  }, [prData, autoRunTest]) // eslint-disable-line react-hooks/exhaustive-deps
 
   function handleEvent(event, accumulated) {
     if (event.type === 'error') {
@@ -114,102 +130,96 @@ export default function TestRunner({ onResultsUpdate }) {
 
   return (
     <div className="test-runner" data-testid="test-runner">
-      <button
-        className="test-runner-header"
-        onClick={() => setOpen(o => !o)}
-        data-testid="test-runner-toggle"
-      >
-        <span>🧪 Repo Test Runner</span>
-        <span className="multiselect-arrow">{open ? '▲' : '▼'}</span>
-      </button>
+      <div className="test-runner-header-static">
+        🧪 Repo Test Runner
+        {running && <span className="test-runner-running-badge">running…</span>}
+      </div>
 
-      {open && (
-        <div className="test-runner-body">
-          <div className="sidebar-field">
-            <label className="sidebar-label">Repo Path</label>
-            <input
-              className="sidebar-input"
-              value={repoPath}
-              onChange={e => setRepoPath(e.target.value)}
-              placeholder="/absolute/path/to/repo"
-              disabled={running}
-              data-testid="test-runner-repo-path"
-            />
-          </div>
-
-          <div style={{ fontSize: '10px', color: 'var(--text-muted)', textAlign: 'center' }}>— or —</div>
-
-          <div className="sidebar-field">
-            <label className="sidebar-label">GitHub URL</label>
-            <input
-              className="sidebar-input"
-              value={repoUrl}
-              onChange={e => setRepoUrl(e.target.value)}
-              placeholder="https://github.com/org/repo"
-              disabled={running}
-              data-testid="test-runner-repo-url"
-            />
-          </div>
-
-          <div className="sidebar-field">
-            <label className="sidebar-label">Base URL</label>
-            <input
-              className="sidebar-input"
-              value={baseUrl}
-              onChange={e => setBaseUrl(e.target.value)}
-              placeholder="http://localhost:3000"
-              disabled={running}
-              data-testid="test-runner-base-url"
-            />
-          </div>
-
-          {error && <div className="error-small" data-testid="test-runner-error">{error}</div>}
-
-          <button
-            className="btn btn-primary"
-            onClick={handleRun}
+      <div className="test-runner-body">
+        <div className="sidebar-field">
+          <label className="sidebar-label">Repo Path</label>
+          <input
+            className="sidebar-input"
+            value={repoPath}
+            onChange={e => setRepoPath(e.target.value)}
+            placeholder="/absolute/path/to/repo"
             disabled={running}
-            style={{ width: '100%' }}
-            data-testid="test-runner-run-btn"
-          >
-            {running ? '⏳ Running…' : '▶ Run Tests'}
-          </button>
-
-          {hasResults && (
-            <div className="test-runner-results" ref={outputRef} data-testid="test-runner-results">
-              {tests.map((t, i) => (
-                <div
-                  key={i}
-                  className={`test-result-row test-result-${t.status}`}
-                  data-testid={`test-result-${t.status}`}
-                >
-                  <span className="test-result-icon">
-                    {t.status === 'pending' ? '⬜' : t.status === 'pass' ? '✅' : '❌'}
-                  </span>
-                  <span className="test-result-title" title={t.title}>{t.title}</span>
-                  {t.duration && <span className="test-result-dur">({t.duration})</span>}
-                </div>
-              ))}
-
-              {rawLines.length > 0 && (
-                <div className="test-raw-output">
-                  {rawLines.map((line, i) => (
-                    <div key={i} className="test-raw-line">{line}</div>
-                  ))}
-                </div>
-              )}
-
-              {summary && (
-                <div className={`test-summary ${summary.failed > 0 ? 'test-summary-fail' : 'test-summary-pass'}`}
-                  data-testid="test-runner-summary">
-                  {summary.passed > 0 && <span>✅ {summary.passed} passed</span>}
-                  {summary.failed > 0 && <span> · ❌ {summary.failed} failed</span>}
-                </div>
-              )}
-            </div>
-          )}
+            data-testid="test-runner-repo-path"
+          />
         </div>
-      )}
+
+        <div style={{ fontSize: '10px', color: 'var(--text-muted)', textAlign: 'center' }}>— or —</div>
+
+        <div className="sidebar-field">
+          <label className="sidebar-label">GitHub URL</label>
+          <input
+            className="sidebar-input"
+            value={repoUrl}
+            onChange={e => setRepoUrl(e.target.value)}
+            placeholder="https://github.com/org/repo"
+            disabled={running}
+            data-testid="test-runner-repo-url"
+          />
+        </div>
+
+        <div className="sidebar-field">
+          <label className="sidebar-label">Base URL</label>
+          <input
+            className="sidebar-input"
+            value={baseUrl}
+            onChange={e => setBaseUrl(e.target.value)}
+            placeholder="http://localhost:3000"
+            disabled={running}
+            data-testid="test-runner-base-url"
+          />
+        </div>
+
+        {error && <div className="error-small" data-testid="test-runner-error">{error}</div>}
+
+        <button
+          className="btn btn-primary"
+          onClick={() => handleRun()}
+          disabled={running}
+          style={{ width: '100%' }}
+          data-testid="test-runner-run-btn"
+        >
+          {running ? '⏳ Running…' : '▶ Run Tests'}
+        </button>
+
+        {hasResults && (
+          <div className="test-runner-results" ref={outputRef} data-testid="test-runner-results">
+            {tests.map((t, i) => (
+              <div
+                key={i}
+                className={`test-result-row test-result-${t.status}`}
+                data-testid={`test-result-${t.status}`}
+              >
+                <span className="test-result-icon">
+                  {t.status === 'pending' ? '⬜' : t.status === 'pass' ? '✅' : '❌'}
+                </span>
+                <span className="test-result-title" title={t.title}>{t.title}</span>
+                {t.duration && <span className="test-result-dur">({t.duration})</span>}
+              </div>
+            ))}
+
+            {rawLines.length > 0 && (
+              <div className="test-raw-output">
+                {rawLines.map((line, i) => (
+                  <div key={i} className="test-raw-line">{line}</div>
+                ))}
+              </div>
+            )}
+
+            {summary && (
+              <div className={`test-summary ${summary.failed > 0 ? 'test-summary-fail' : 'test-summary-pass'}`}
+                data-testid="test-runner-summary">
+                {summary.passed > 0 && <span>✅ {summary.passed} passed</span>}
+                {summary.failed > 0 && <span> · ❌ {summary.failed} failed</span>}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
     </div>
   )
 }
