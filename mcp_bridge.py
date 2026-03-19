@@ -481,13 +481,15 @@ def fetch_dev_status(base_url: str, email: str, token: str, issue_key: str) -> d
                 continue
             for repo in detail_resp.json().get("detail", []):
                 for pr in repo.get("pullRequests", []):
+                    src = (pr.get("source") or {}).get("branch", "")
+                    dst = (pr.get("destination") or {}).get("branch", "")
                     prs.append({
                         "title":              pr.get("name", ""),
                         "url":                pr.get("url", ""),
                         "status":             pr.get("status", "UNKNOWN"),
                         "author":             (pr.get("author") or {}).get("name", ""),
-                        "source_branch":      (pr.get("source") or {}).get("branch", {}).get("name", ""),
-                        "destination_branch": (pr.get("destination") or {}).get("branch", {}).get("name", ""),
+                        "source_branch":      src if isinstance(src, str) else src.get("name", ""),
+                        "destination_branch": dst if isinstance(dst, str) else dst.get("name", ""),
                         "app_type":           app_type,
                     })
 
