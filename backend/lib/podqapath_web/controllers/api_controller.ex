@@ -400,14 +400,14 @@ defmodule PodqapathWeb.ApiController do
         ]
       )
 
-    {conn, passed, failed} = stream_port_output(conn, port, 0, 0)
+    {conn, passed, failed} = stream_port_output(conn, port, 0, 0, 20)
     exit_code = receive_exit(port)
 
     stream_event(conn, %{type: "done", exit_code: exit_code, passed: passed, failed: failed})
     conn
   end
 
-  defp stream_port_output(conn, port, passed, failed) do
+  defp stream_port_output(conn, port, passed, failed, heartbeats_left) do
     receive do
       {^port, {:data, {:eol, line}}} ->
         text = String.trim(line)
@@ -456,16 +456,21 @@ defmodule PodqapathWeb.ApiController do
             {conn, passed, failed}
           end
 
-        stream_port_output(conn, port, passed, failed)
+        stream_port_output(conn, port, passed, failed, 20)
 
       {^port, {:exit_status, _}} ->
         {conn, passed, failed}
     after
-      300_000 ->
-        # 5 min timeout
-        Port.close(port)
-        stream_event(conn, %{type: "error", message: "Test run timed out after 5 minutes."})
-        {conn, passed, failed}
+      15_000 ->
+        if heartbeats_left > 0 do
+          # Heartbeat comment to keep the SSE connection alive (every 15s, up to 5 min total)
+          chunk(conn, ": heartbeat\n\n")
+          stream_port_output(conn, port, passed, failed, heartbeats_left - 1)
+        else
+          Port.close(port)
+          stream_event(conn, %{type: "error", message: "Test run timed out after 5 minutes."})
+          {conn, passed, failed}
+        end
     end
   end
 
