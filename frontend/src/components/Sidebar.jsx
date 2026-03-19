@@ -75,10 +75,6 @@ export default function Sidebar({
   const filtersLoaded = filters.labels.length > 0 || filters.statuses.length > 0
 
   async function handleConnect() {
-    if (!projectKey.trim()) {
-      setFiltersError('Enter a project key first')
-      return
-    }
     setFiltersLoading(true)
     setFiltersError('')
     try {
@@ -142,7 +138,7 @@ export default function Sidebar({
         <button
           className="btn btn-secondary"
           onClick={handleConnect}
-          disabled={filtersLoading || !projectKey.trim()}
+          disabled={filtersLoading}
           data-testid="connect-btn"
         >
           {filtersLoading ? 'Connecting…' : 'Connect & Load Filters'}
