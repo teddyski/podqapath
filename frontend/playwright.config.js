@@ -6,7 +6,7 @@ import { defineConfig, devices } from '@playwright/test'
  * Setup:
  *   1. npm install          (installs @playwright/test)
  *   2. npx playwright install chromium
- *   3. In a separate terminal: DEMO_MODE=true uvicorn main:app --port 8000
+ *   3. In a separate terminal: cd backend && DEMO_MODE=true mix phx.server
  *   4. npm run test:e2e
  *
  * The tests use the backend's demo data layer (DEMO_MODE=true) so no live
@@ -32,15 +32,15 @@ export default defineConfig({
 
   webServer: [
     {
-      // FastAPI backend — must be started with DEMO_MODE=true
-      command: 'DEMO_MODE=true uvicorn main:app --port 8000',
-      url: 'http://localhost:8000/api/health',
-      cwd: '../',
+      // Phoenix backend — must be started with DEMO_MODE=true
+      command: 'DEMO_MODE=true mix phx.server',
+      url: 'http://localhost:4000/api/health',
+      cwd: '../backend',
       reuseExistingServer: true,
-      timeout: 15000,
+      timeout: 20000,
     },
     {
-      // Vite dev server — proxies /api to :8000
+      // Vite dev server — proxies /api to :4000
       command: 'npm run dev',
       url: 'http://localhost:5173',
       reuseExistingServer: true,

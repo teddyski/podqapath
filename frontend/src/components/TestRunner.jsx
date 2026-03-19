@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 
-export default function TestRunner({ prData, autoRunTest, onClearAutoRun, onResultsUpdate }) {
+export default function TestRunner({ autoFillUrl, onResultsUpdate }) {
   const [repoPath, setRepoPath] = useState('')
   const [repoUrl, setRepoUrl] = useState('')
   const [baseUrl, setBaseUrl] = useState('http://localhost:3000')
@@ -18,6 +18,14 @@ export default function TestRunner({ prData, autoRunTest, onClearAutoRun, onResu
       outputRef.current.scrollTop = outputRef.current.scrollHeight
     }
   }, [tests, rawLines])
+
+  // Auto-fill repo URL when a GitHub PR is linked to the selected ticket
+  useEffect(() => {
+    if (autoFillUrl) {
+      setRepoUrl(autoFillUrl)
+      setRepoPath('')
+    }
+  }, [autoFillUrl])
 
   const handleRun = useCallback(async (overrideUrl = null) => {
     const urlToUse = overrideUrl !== null ? overrideUrl : repoUrl.trim()
@@ -80,20 +88,6 @@ export default function TestRunner({ prData, autoRunTest, onClearAutoRun, onResu
       setRunning(false)
     }
   }, [repoPath, repoUrl, baseUrl, onResultsUpdate])
-
-  // Auto-run only when the ▶ Test button was clicked and prData has arrived
-  useEffect(() => {
-    if (!autoRunTest || !prData) return
-    const prUrl = prData?.prs?.[0]?.url || ''
-    if (!prUrl.includes('github.com')) return
-    const m = prUrl.match(/^(https:\/\/github\.com\/[^/]+\/[^/]+)/)
-    if (!m) return
-    onClearAutoRun?.()
-    const repoBase = m[1]
-    setRepoUrl(repoBase)
-    setRepoPath('')
-    handleRun(repoBase)
-  }, [prData, autoRunTest]) // eslint-disable-line react-hooks/exhaustive-deps
 
   function handleEvent(event, accumulated) {
     if (event.type === 'error') {

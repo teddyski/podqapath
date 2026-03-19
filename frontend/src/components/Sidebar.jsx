@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
-import { loadFilters } from '../api'
+import { loadFilters, fetchProjects } from '../api'
 
 // ---------------------------------------------------------------------------
 // Multi-select dropdown
@@ -72,13 +72,14 @@ export default function Sidebar({
 }) {
   const [filtersLoading, setFiltersLoading] = useState(false)
   const [filtersError, setFiltersError] = useState('')
+  const [projects, setProjects] = useState([])
   const filtersLoaded = filters.labels.length > 0 || filters.statuses.length > 0
 
+  useEffect(() => {
+    fetchProjects().then(setProjects).catch(() => {})
+  }, [])
+
   async function handleConnect() {
-    if (!projectKey.trim()) {
-      setFiltersError('Enter a project key first')
-      return
-    }
     setFiltersLoading(true)
     setFiltersError('')
     try {
@@ -126,23 +127,26 @@ export default function Sidebar({
 
       {/* ── Connect form ── */}
       <div className="connect-form">
-        <label className="sidebar-label">Project Key</label>
-        <input
+        <label className="sidebar-label">Project</label>
+        <select
           className="sidebar-input"
           value={projectKey}
           onChange={e => {
-            onProjectKeyChange(e.target.value.toUpperCase())
+            onProjectKeyChange(e.target.value)
             setFiltersError('')
           }}
-          onKeyDown={e => e.key === 'Enter' && handleConnect()}
-          placeholder="e.g. SCRUM"
           disabled={filtersLoading}
           data-testid="project-key-input"
-        />
+        >
+          <option value="">— select a project —</option>
+          {projects.map(p => (
+            <option key={p.key} value={p.key}>{p.name} ({p.key})</option>
+          ))}
+        </select>
         <button
           className="btn btn-secondary"
           onClick={handleConnect}
-          disabled={filtersLoading || !projectKey.trim()}
+          disabled={filtersLoading}
           data-testid="connect-btn"
         >
           {filtersLoading ? 'Connecting…' : 'Connect & Load Filters'}

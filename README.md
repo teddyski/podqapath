@@ -2,7 +2,7 @@
 
 **An Agentic Release Auditor for Pod-Based QA Teams.**
 
-PodQApath is a React dashboard backed by a FastAPI server that connects Jira and GitHub through the **Model Context Protocol (MCP)**, scores ticket risk in real time, surfaces PR diffs for any linked pull request, and gives your team an AI-powered QA analyst (QA-7) to drive release readiness decisions.
+PodQApath is a React dashboard backed by an **Elixir/Phoenix** server (with a legacy FastAPI server also included) that connects Jira and GitHub, scores ticket risk in real time, surfaces PR diffs for any linked pull request, and gives your team an AI-powered QA analyst (QA-7) to drive release readiness decisions.
 
 ---
 
@@ -32,11 +32,12 @@ PodQApath is a React dashboard backed by a FastAPI server that connects Jira and
 | Layer | Technology |
 |---|---|
 | Frontend | React 18 + Vite 5 |
-| Backend | FastAPI (Python 3.11+) |
-| AI | Anthropic SDK — claude-sonnet-4-6 |
+| Backend (primary) | Elixir 1.17 / Phoenix 1.7 — `backend/` |
+| Backend (legacy) | FastAPI (Python 3.11+) — `main.py` |
+| AI | Anthropic API — claude-sonnet-4-6 |
 | Protocol | Model Context Protocol (MCP) via `mcp-atlassian` |
 | Integrations | Jira Software, GitHub |
-| Data Bridge | `mcp_bridge.py` — all data fetching and risk scoring logic |
+| Data Bridge | `mcp_bridge.py` (Python) · `backend/lib/podqapath/` (Elixir) |
 
 ---
 
@@ -92,8 +93,19 @@ cp .env.example .env
 
 ### 6. Start the Backend
 
+**Elixir/Phoenix (recommended)** — listens on port 4000, reads `.env` automatically:
+
+```bash
+cd backend
+mix deps.get
+mix phx.server
+```
+
+**FastAPI (legacy)** — listens on port 8000:
+
 ```bash
 uvicorn main:app --reload --port 8000
+# then update frontend/vite.config.js proxy target to http://localhost:8000
 ```
 
 ### 7. Start the Frontend
@@ -104,6 +116,8 @@ npm run dev
 ```
 
 Open [http://localhost:5173](http://localhost:5173) in your browser.
+
+> The Vite dev server proxies `/api` to the Phoenix backend on port 4000 by default.
 
 ---
 
@@ -162,12 +176,11 @@ Scores are 0–100 and clipped. Dominant factor is release proximity:
 
 ## Repo Test Runner
 
-The **🧪 Repo Test Runner** panel in the sidebar lets you run any project's Playwright test suite without leaving PodQApath.
+The **🧪 Repo Test Runner** panel lives below the Code Change Viewer. It can be triggered manually or automatically — clicking **▶ Test** on any ticket with a linked GitHub PR will auto-populate the repo URL and start the run immediately.
 
-1. Click **🧪 Repo Test Runner** in the sidebar to expand the panel
-2. Enter either an **absolute local path** to the repo or a **GitHub URL** (it will be cloned automatically)
-3. Set the **Base URL** of the QA environment you want to test against (passed as `BASE_URL` env var)
-4. Click **▶ Run Tests**
+1. Select a ticket and click **▶ Test** to auto-run against its linked GitHub repo, or enter a path/URL manually
+2. Set the **Base URL** of the QA environment you want to test against (passed as `BASE_URL` env var)
+3. Click **▶ Run Tests** to start manually
 
 PodQApath will:
 - Discover all tests upfront and display them as ⬜ pending
@@ -190,7 +203,7 @@ npx playwright install chromium
 npm run test:e2e
 ```
 
-The config (`playwright.config.js`) automatically starts both the FastAPI backend (with `DEMO_MODE=true`) and the Vite dev server before running tests. Tests cover:
+The config (`playwright.config.js`) automatically starts both the backend (with `DEMO_MODE=true`) and the Vite dev server before running tests. Tests cover:
 
 - Loading demo data and populating the ticket list
 - Filter enable state after demo load
