@@ -1,5 +1,21 @@
 import Config
 
+# Load .env from the project root, skipping any lines dotenvy can't parse
+env_file = Path.join([__DIR__, "..", "..", ".env"]) |> Path.expand()
+if File.exists?(env_file) do
+  env_file
+  |> File.read!()
+  |> String.split("\n")
+  |> Enum.each(fn line ->
+    line = String.trim(line)
+    if line != "" and not String.starts_with?(line, "#") and String.contains?(line, "=") do
+      [key | rest] = String.split(line, "=", parts: 2)
+      val = Enum.join(rest, "=") |> String.trim("\"") |> String.trim("'")
+      System.put_env(String.trim(key), val)
+    end
+  end)
+end
+
 # config/runtime.exs is executed for all environments, including
 # during releases. It is executed after compilation and before the
 # system starts, so it is typically used to load production configuration
