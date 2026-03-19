@@ -173,6 +173,8 @@ def fetch_jira_via_mcp(jira_url: str, email: str, token: str,
                 "Issue Type": (f.get("issuetype") or {}).get("name", "Unknown"),
                 "Component": ", ".join(c["name"] for c in (f.get("components") or [])) or "None",
                 "Days Open": _days_since(f.get("created", "")),
+                "FixVersionDate": _nearest_fix_version_date(f.get("fixVersions", [])),
+                "SprintEndDate":  _parse_sprint_end_date(f.get("customfield_10020")),
             })
     except (json.JSONDecodeError, KeyError) as e:
         logging.warning("fetch_jira_via_mcp: could not parse MCP response as JSON (%s). Raw: %s", e, raw[:200])
@@ -391,6 +393,8 @@ def generate_sample_jira_df() -> pd.DataFrame:
         "Issue Type": ["Bug", "Story", "Bug", "Task", "Bug"],
         "Component": ["core", "ui", "api", "docs", "core"],
         "Days Open": [3, 21, 7, 1, 30],
+        "FixVersionDate": ["2026-03-20", "", "2026-03-25", "", ""],
+        "SprintEndDate":  ["", "2026-04-08", "", "", "2026-04-15"],
     }
     return _normalize_jira_df(pd.DataFrame(data))
 
@@ -790,7 +794,8 @@ def fetch_live_jira(base_url: str, email: str, token: str,
         json={"jql": jql,
               "maxResults": max_results,
               "fields": ["summary", "priority", "status", "assignee",
-                         "issuetype", "components", "created"]},
+                         "issuetype", "components", "created",
+                         "fixVersions", "customfield_10020"]},
         auth=HTTPBasicAuth(email, token),
         timeout=15,
     )
@@ -808,6 +813,8 @@ def fetch_live_jira(base_url: str, email: str, token: str,
             "Issue Type": (f.get("issuetype") or {}).get("name", "Unknown"),
             "Component": ", ".join(c["name"] for c in (f.get("components") or [])) or "None",
             "Days Open": _days_since(f.get("created", "")),
+            "FixVersionDate": _nearest_fix_version_date(f.get("fixVersions", [])),
+            "SprintEndDate":  _parse_sprint_end_date(f.get("customfield_10020")),
         })
 
     return _normalize_jira_df(pd.DataFrame(rows))
@@ -906,6 +913,73 @@ def fetch_jira_sprints(base_url: str, email: str, token: str, project_key: str) 
 
 
 # ---------------------------------------------------------------------------
+# Release Proximity Helpers (SCRUM-18)
+# ---------------------------------------------------------------------------
+
+def _nearest_fix_version_date(fix_versions: list) -> str:
+    """Return the nearest fix version releaseDate as ISO string, or ''."""
+    from datetime import date
+    nearest = None
+    for v in (fix_versions or []):
+        rd = v.get("releaseDate", "") if isinstance(v, dict) else ""
+        if rd:
+            try:
+                d = date.fromisoformat(str(rd)[:10])
+                if nearest is None or d < nearest:
+                    nearest = d
+            except Exception:
+                pass
+    return nearest.isoformat() if nearest else ""
+
+
+def _parse_sprint_end_date(sprint_field) -> str:
+    """Extract sprint end date from Jira customfield_10020, or ''."""
+    if not sprint_field:
+        return ""
+    sprints = sprint_field if isinstance(sprint_field, list) else [sprint_field]
+    for sprint in sprints:
+        if isinstance(sprint, dict):
+            end = sprint.get("endDate", "")
+            if end:
+                return str(end)[:10]
+        elif isinstance(sprint, str):
+            m = re.search(r"endDate=([^,\]\s]+)", sprint)
+            if m:
+                return m.group(1)[:10]
+    return ""
+
+
+def _days_until_release(row) -> int | None:
+    """Return minimum days until release (fix version or sprint end), or None."""
+    from datetime import date
+    today = date.today()
+    candidates = []
+    for col in ("FixVersionDate", "SprintEndDate"):
+        ds = str(row.get(col, "") or "")
+        if len(ds) >= 10:
+            try:
+                candidates.append((date.fromisoformat(ds[:10]) - today).days)
+            except Exception:
+                pass
+    return min(candidates) if candidates else None
+
+
+def _release_proximity_score(days: int | None) -> int:
+    """Convert days until release to an urgency score contribution."""
+    if days is None:
+        return 0
+    if days <= 2:
+        return 70
+    if days <= 7:
+        return 35
+    if days <= 14:
+        return 20
+    if days <= 21:
+        return 5
+    return 0
+
+
+# ---------------------------------------------------------------------------
 # Risk Scoring
 # ---------------------------------------------------------------------------
 
@@ -915,6 +989,8 @@ def compute_risk_scores(
     pr_cache: dict | None = None,
 ) -> pd.DataFrame:
     df = jira_df.copy()
+
+    # --- Existing health signals ---
     priority_map = {"critical": 30, "high": 20, "medium": 10, "low": 5, "unknown": 15}
     df["_p"] = df["Priority"].str.lower().map(priority_map).fillna(15)
     df["_a"] = df["Days Open"].apply(lambda d: 20 if d > 14 else 10 if d > 7 else 0)
@@ -923,16 +999,28 @@ def compute_risk_scores(
         df["_b"] = df["Issue Key"].apply(lambda k: 0 if k in linked else 25)
     else:
         df["_b"] = 12
-    # Override branch penalty for tickets confirmed to have a PR
     if pr_cache:
         df["_b"] = df.apply(
             lambda r: 0 if pr_cache.get(r["Issue Key"]) is True else r["_b"], axis=1
         )
-    is_bug = df["Issue Type"].str.lower().str.contains("bug", na=False)
+    is_bug  = df["Issue Type"].str.lower().str.contains("bug", na=False)
     is_core = df["Component"].str.lower().str.contains("core|api", na=False)
     df["_t"] = (is_bug & is_core).map({True: 15, False: 5}).fillna(5)
     df["_u"] = df["Assignee"].str.lower().apply(lambda a: 10 if "unassigned" in a else 0)
-    df["RiskScore"] = (df["_p"] + df["_a"] + df["_b"] + df["_t"] + df["_u"]).clip(0, 100).astype(int)
+
+    # --- Release proximity signal (SCRUM-18) ---
+    df["_days_until"] = df.apply(_days_until_release, axis=1)
+    df["_r"] = df["_days_until"].apply(_release_proximity_score)
+    # Status vs proximity boost: active work with ≤2 days → extra push to RED
+    in_progress_mask   = df["Status"].str.lower().str.contains(
+        "in progress|in qa|in testing|in review", na=False
+    )
+    critical_time_mask = df["_days_until"].apply(lambda d: d is not None and d <= 2)
+    df["_r"] = df["_r"] + (in_progress_mask & critical_time_mask) * 10
+
+    df["RiskScore"] = (
+        df["_p"] + df["_a"] + df["_b"] + df["_t"] + df["_u"] + df["_r"]
+    ).clip(0, 100).astype(int)
     df["RiskBand"] = df["RiskScore"].apply(_score_to_band)
 
     def _reasons(row):
@@ -955,10 +1043,19 @@ def compute_risk_scores(
             reasons.append("Bug in core/API")
         if row["_u"] == 10:
             reasons.append("Unassigned")
+        # Release proximity reason
+        days = row["_days_until"]
+        if days is not None:
+            if days <= 0:
+                reasons.append(f"Release overdue by {abs(int(days))}d")
+            elif days == 1:
+                reasons.append("1 day until release")
+            else:
+                reasons.append(f"{int(days)} days until release")
         return reasons
 
     df["RiskReasons"] = df.apply(_reasons, axis=1)
-    return df.drop(columns=["_p", "_a", "_b", "_t", "_u"])
+    return df.drop(columns=["_p", "_a", "_b", "_t", "_u", "_r", "_days_until"])
 
 
 # ---------------------------------------------------------------------------
@@ -1031,6 +1128,8 @@ def _normalize_jira_df(df: pd.DataFrame) -> pd.DataFrame:
         "Issue Key": "UNKNOWN", "Summary": "", "Priority": "Unknown",
         "Status": "Unknown", "Assignee": "Unassigned",
         "Issue Type": "Unknown", "Component": "None", "Days Open": 0,
+        "FixVersionDate": "",
+        "SprintEndDate":  "",
     }
     for col, default in defaults.items():
         if col not in df.columns:

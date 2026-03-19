@@ -438,8 +438,9 @@ with col1:
                 label, desc = BAND_LABEL[band]
                 st.markdown(f"**{label}** — {desc}")
             st.caption(
-                "Score factors: priority (+5–30), days open (+0–20), "
-                "no linked branch (+25), bug in core/API (+15), unassigned (+10)"
+                "Score factors: release proximity (+0–70), priority (+5–30), "
+                "days open (+0–20), no linked branch (+25), "
+                "bug in core/API (+15), unassigned (+10)"
             )
 
         # Card list — scrollable fixed-height window
