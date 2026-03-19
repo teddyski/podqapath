@@ -18,6 +18,7 @@ export default function App() {
   const [prData, setPrData] = useState(null)
   const [loadingPR, setLoadingPR] = useState(false)
   const [demoMode, setDemoMode] = useState(false)
+  const [testResults, setTestResults] = useState('')
 
   const handleFetchTickets = useCallback(async () => {
     setLoadingTickets(true)
@@ -131,6 +132,10 @@ export default function App() {
       }
     }
 
+    if (testResults) {
+      parts.push(`## Latest Test Run\n${testResults}`)
+    }
+
     return parts.join('\n\n')
   })()
 
@@ -145,6 +150,7 @@ export default function App() {
         onActiveFiltersChange={setActiveFilters}
         onFetchTickets={handleFetchTickets}
         onLoadDemo={handleLoadDemo}
+        onTestResultsUpdate={setTestResults}
         loading={loadingTickets}
       />
       <main className="main-grid">

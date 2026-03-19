@@ -134,6 +134,60 @@ test.describe('Chat panel', () => {
   })
 })
 
+test.describe('Repo Test Runner panel', () => {
+  test('panel is collapsed by default and expands on click', async ({ page }) => {
+    await page.goto('/')
+
+    const toggle = page.locator('[data-testid="test-runner-toggle"]')
+    await expect(toggle).toBeVisible()
+
+    // Body hidden initially
+    await expect(page.locator('[data-testid="test-runner-repo-path"]')).not.toBeVisible()
+
+    // Expand
+    await toggle.click()
+    await expect(page.locator('[data-testid="test-runner-repo-path"]')).toBeVisible()
+    await expect(page.locator('[data-testid="test-runner-repo-url"]')).toBeVisible()
+    await expect(page.locator('[data-testid="test-runner-base-url"]')).toBeVisible()
+    await expect(page.locator('[data-testid="test-runner-run-btn"]')).toBeVisible()
+
+    // Collapse
+    await toggle.click()
+    await expect(page.locator('[data-testid="test-runner-repo-path"]')).not.toBeVisible()
+  })
+
+  test('shows error when Run Tests is clicked with no inputs', async ({ page }) => {
+    await page.goto('/')
+    await page.click('[data-testid="test-runner-toggle"]')
+    await page.click('[data-testid="test-runner-run-btn"]')
+
+    await expect(page.locator('[data-testid="test-runner-error"]')).toBeVisible()
+    await expect(page.locator('[data-testid="test-runner-error"]')).toContainText('repo path or GitHub URL')
+  })
+
+  test('runs the PodQApath Playwright suite and streams results', async ({ page }) => {
+    await page.goto('/')
+    await page.click('[data-testid="test-runner-toggle"]')
+
+    // Run PodQApath's own tests — guaranteed to have playwright.config.js
+    const frontendDir = process.cwd()
+    await page.fill('[data-testid="test-runner-repo-path"]', frontendDir)
+    await page.fill('[data-testid="test-runner-base-url"]', 'http://localhost:5173')
+
+    await page.click('[data-testid="test-runner-run-btn"]')
+
+    // Results panel should appear
+    await expect(page.locator('[data-testid="test-runner-results"]')).toBeVisible({ timeout: 30000 })
+
+    // At least one result row should stream in
+    const resultRows = page.locator('[data-testid^="test-result-"]')
+    await expect(resultRows.first()).toBeVisible({ timeout: 60000 })
+
+    // Summary line should appear when run finishes
+    await expect(page.locator('[data-testid="test-runner-summary"]')).toBeVisible({ timeout: 120000 })
+  })
+})
+
 test.describe('Manager mode toggle', () => {
   test('toggling Manager Mode changes the label and clears history', async ({ page }) => {
     await page.goto('/')

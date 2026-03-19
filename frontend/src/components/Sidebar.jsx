@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from 'react'
 import { loadFilters } from '../api'
+import TestRunner from './TestRunner'
 
 // ---------------------------------------------------------------------------
 // Multi-select dropdown
@@ -68,7 +69,7 @@ export default function Sidebar({
   projectKey, onProjectKeyChange,
   filters, onFiltersLoaded,
   activeFilters, onActiveFiltersChange,
-  onFetchTickets, onLoadDemo, loading,
+  onFetchTickets, onLoadDemo, onTestResultsUpdate, loading,
 }) {
   const [filtersLoading, setFiltersLoading] = useState(false)
   const [filtersError, setFiltersError] = useState('')
@@ -195,6 +196,9 @@ export default function Sidebar({
       >
         {loading ? 'Fetching…' : '☁️ Fetch Live Data'}
       </button>
+
+      {/* ── Repo Test Runner ── */}
+      <TestRunner onResultsUpdate={onTestResultsUpdate} />
 
       {/* ── Risk Key ── */}
       <div className="risk-key">

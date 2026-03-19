@@ -5,11 +5,17 @@ Run: uvicorn main:app --reload --port 8000
 """
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from pathlib import Path
 from dotenv import load_dotenv
+import asyncio
+import json
 import os
+import re
+import shutil
+import tempfile
 import mcp_bridge as bridge
 
 load_dotenv()
@@ -57,6 +63,45 @@ class TicketsRequest(BaseModel):
 class PRDiffRequest(BaseModel):
     ticket_key: str
     demo_mode: bool = False
+
+class RunTestsRequest(BaseModel):
+    repo_path: str = ""
+    repo_url: str = ""
+    base_url: str = "http://localhost:3000"
+
+
+# ---------------------------------------------------------------------------
+# Playwright output parsers
+# ---------------------------------------------------------------------------
+def _parse_list_line(text: str) -> str | None:
+    """Parse a test title from 'npx playwright test --list' output."""
+    stripped = text.lstrip()
+    if not stripped.startswith('['):
+        return None
+    parts = stripped.split(' › ')
+    if len(parts) < 3:
+        return None
+    return ' › '.join(parts[2:]).strip()
+
+
+def _parse_result_line(text: str) -> tuple[str | None, str | None, str | None]:
+    """Parse status, title, duration from a playwright --reporter=list line."""
+    stripped = text.lstrip()
+    if stripped[:1] in ('✓', '·'):
+        status = 'pass'
+    elif stripped[:1] in ('✗', '×', '✘'):
+        status = 'fail'
+    else:
+        return None, None, None
+    rest = re.sub(r'^[✓·✗×✘]\s+\d+\s+', '', stripped)
+    parts = rest.split(' › ')
+    if len(parts) < 3:
+        return None, None, None
+    title_dur = ' › '.join(parts[2:])
+    m = re.match(r'(.+?)\s+\(([\d.]+s)\)\s*$', title_dur)
+    if m:
+        return status, m.group(1).strip(), m.group(2)
+    return status, title_dur.strip(), ''
 
 class ChatRequest(BaseModel):
     message: str
@@ -157,6 +202,111 @@ def chat(req: ChatRequest):
         return {"reply": response.content[0].text}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/run-tests")
+async def run_tests(req: RunTestsRequest):
+    async def _stream():
+        work_dir = req.repo_path.strip()
+        tmp_dir = None
+
+        # Clone GitHub repo if a URL was provided instead of a local path
+        if req.repo_url.strip() and not work_dir:
+            tmp_dir = tempfile.mkdtemp()
+            clone = await asyncio.create_subprocess_exec(
+                "git", "clone", "--depth=1", req.repo_url.strip(), tmp_dir,
+                stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE,
+            )
+            _, stderr = await clone.communicate()
+            if clone.returncode != 0:
+                msg = stderr.decode("utf-8", errors="replace")[:300]
+                yield f"data: {json.dumps({'type': 'error', 'message': f'git clone failed: {msg}'})}\n\n"
+                shutil.rmtree(tmp_dir, ignore_errors=True)
+                return
+            work_dir = tmp_dir
+
+        if not work_dir:
+            yield f"data: {json.dumps({'type': 'error', 'message': 'Provide a repo path or GitHub URL.'})}\n\n"
+            return
+        if not Path(work_dir).exists():
+            yield f"data: {json.dumps({'type': 'error', 'message': f'Path not found: {work_dir}'})}\n\n"
+            return
+
+        # Locate Playwright config
+        config_file = next(
+            (n for n in ["playwright.config.js", "playwright.config.ts", "playwright.config.mjs"]
+             if (Path(work_dir) / n).exists()),
+            None,
+        )
+        if not config_file:
+            yield f"data: {json.dumps({'type': 'error', 'message': 'No Playwright config found in repo root.'})}\n\n"
+            if tmp_dir:
+                shutil.rmtree(tmp_dir, ignore_errors=True)
+            return
+
+        yield f"data: {json.dumps({'type': 'start', 'config': config_file})}\n\n"
+
+        env = {**os.environ, "PLAYWRIGHT_FORCE_TTY": "0", "CI": "1"}
+        if req.base_url.strip():
+            env["BASE_URL"] = req.base_url.strip()
+
+        # Phase 1 — discover tests so the frontend can show ⬜ pending states
+        try:
+            list_proc = await asyncio.create_subprocess_exec(
+                "npx", "playwright", "test", "--list",
+                cwd=work_dir, env=env,
+                stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE,
+            )
+            list_out, _ = await asyncio.wait_for(list_proc.communicate(), timeout=30)
+            for raw in list_out.decode("utf-8", errors="replace").splitlines():
+                title = _parse_list_line(raw)
+                if title:
+                    yield f"data: {json.dumps({'type': 'discovered', 'title': title})}\n\n"
+        except (asyncio.TimeoutError, Exception):
+            pass  # discovery failure is non-fatal; still run the tests
+
+        # Phase 2 — run the suite and stream results
+        proc = await asyncio.create_subprocess_exec(
+            "npx", "playwright", "test", "--reporter=list",
+            cwd=work_dir, env=env,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.STDOUT,
+        )
+
+        summary_re = re.compile(r'(\d+)\s+passed(?:[^\d]+(\d+)\s+failed)?')
+        passed = failed = 0
+
+        async for raw_line in proc.stdout:
+            text = raw_line.decode("utf-8", errors="replace").rstrip()
+            if not text:
+                continue
+            status, title, duration = _parse_result_line(text)
+            if status:
+                if status == 'pass':
+                    passed += 1
+                else:
+                    failed += 1
+                yield f"data: {json.dumps({'type': 'result', 'title': title, 'status': status, 'duration': duration})}\n\n"
+            else:
+                sm = summary_re.search(text)
+                if sm and 'passed' in text:
+                    p = int(sm.group(1))
+                    f_ = int(sm.group(2)) if sm.group(2) else 0
+                    yield f"data: {json.dumps({'type': 'summary', 'passed': p, 'failed': f_})}\n\n"
+                else:
+                    yield f"data: {json.dumps({'type': 'output', 'text': text})}\n\n"
+
+        await proc.wait()
+        yield f"data: {json.dumps({'type': 'done', 'exit_code': proc.returncode, 'passed': passed, 'failed': failed})}\n\n"
+
+        if tmp_dir:
+            shutil.rmtree(tmp_dir, ignore_errors=True)
+
+    return StreamingResponse(
+        _stream(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
+
 
 # Serve built React frontend in production
 frontend_dist = Path(__file__).parent / "frontend" / "dist"

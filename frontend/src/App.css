@@ -921,6 +921,121 @@ a:hover {
 }
 
 /* =========================================================
+   Repo Test Runner (SCRUM-23)
+   ========================================================= */
+
+.test-runner {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+.test-runner-header {
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 10px;
+  background: var(--surface);
+  border: none;
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  text-align: left;
+  font-family: var(--font);
+  letter-spacing: 0.2px;
+}
+
+.test-runner-header:hover {
+  background: var(--surface-hover);
+}
+
+.test-runner-body {
+  padding: 10px;
+  background: var(--bg);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  border-top: 1px solid var(--border);
+}
+
+.test-runner-results {
+  max-height: 220px;
+  overflow-y: auto;
+  background: #0a0d13;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) transparent;
+}
+
+.test-result-row {
+  display: flex;
+  align-items: baseline;
+  gap: 5px;
+  font-size: 11px;
+  line-height: 1.5;
+  min-width: 0;
+}
+
+.test-result-icon {
+  font-size: 10px;
+  flex-shrink: 0;
+  line-height: 1.5;
+}
+
+.test-result-title {
+  flex: 1;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.test-result-pending .test-result-title { color: var(--text-muted); }
+.test-result-pass    .test-result-title { color: var(--success); }
+.test-result-fail    .test-result-title { color: var(--danger); }
+
+.test-result-dur {
+  font-size: 10px;
+  color: var(--text-muted);
+  flex-shrink: 0;
+  font-family: var(--font-mono);
+}
+
+.test-raw-output {
+  border-top: 1px solid var(--border);
+  padding-top: 4px;
+  margin-top: 2px;
+}
+
+.test-raw-line {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: #6a6a80;
+  white-space: pre-wrap;
+  word-break: break-all;
+  line-height: 1.4;
+}
+
+.test-summary {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 5px 0 2px;
+  border-top: 1px solid var(--border);
+  margin-top: 3px;
+}
+
+.test-summary-pass { color: var(--success); }
+.test-summary-fail { color: var(--danger); }
+
+/* =========================================================
    Scrollbar styling (WebKit)
    ========================================================= */
 
