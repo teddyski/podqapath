@@ -427,10 +427,10 @@ with col1:
 
         BAND_EMOJI = {"RED": "🔴", "ORANGE": "🟠", "YELLOW": "🟡", "GREEN": "🟢"}
         BAND_LABEL = {
-            "RED":    ("🔴 Critical risk", "Score 81–100 — needs attention before release"),
-            "ORANGE": ("🟠 High risk",     "Score 61–80 — review carefully"),
-            "YELLOW": ("🟡 Medium risk",   "Score 31–60 — monitor closely"),
-            "GREEN":  ("🟢 Low risk",      "Score 0–30 — looking good"),
+            "RED":    ("🔴 Critical risk", "Score 81–100 — release is imminent or health is critical; block until resolved"),
+            "ORANGE": ("🟠 High risk",     "Score 61–80 — release proximity or multiple health flags; needs owner attention now"),
+            "YELLOW": ("🟡 Medium risk",   "Score 31–60 — some risk signals present; monitor and assign before sprint end"),
+            "GREEN":  ("🟢 Low risk",      "Score 0–30 — release not imminent and ticket is healthy; safe to proceed"),
         }
 
         with st.expander("Risk score guide", expanded=False):
@@ -438,9 +438,9 @@ with col1:
                 label, desc = BAND_LABEL[band]
                 st.markdown(f"**{label}** — {desc}")
             st.caption(
-                "Score factors: release proximity (+0–70), priority (+5–30), "
-                "days open (+0–20), no linked branch (+25), "
-                "bug in core/API (+15), unassigned (+10)"
+                "Dominant factor: release proximity — ≤2 days +70, ≤7 days +35, ≤14 days +20, ≤21 days +5  |  "
+                "Other factors: priority (+5–30), days open (+0–20), "
+                "no linked branch (+25), bug in core/API (+15), unassigned (+10)"
             )
 
         # Card list — scrollable fixed-height window
