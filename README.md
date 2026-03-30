@@ -1,219 +1,111 @@
 # PodQApath
 
-**An Agentic Release Auditor for Pod-Based QA Teams.**
+**An Agentic Release Auditor for QA Teams Who Know What Actually Breaks.**
 
-PodQApath is a React dashboard backed by an **Elixir/Phoenix** server (with a legacy FastAPI server also included) that connects Jira and GitHub, scores ticket risk in real time, surfaces PR diffs for any linked pull request, and gives your team an AI-powered QA analyst (QA-7) to drive release readiness decisions.
+PodQApath started as a proof of concept — a fast, AI-assisted prototype built to demonstrate a simple idea: QA tooling should be connected to what the system *actually does*, not just what the ticket says it does.
 
----
-
-## Demo
-
-> Drag the demo video into a GitHub Issue to get a CDN link, then embed it here.
+It is not production-ready. It is the skeleton of something I intend to build properly.
 
 ---
 
-## Key Features
+## The Nurse System
 
-| Feature | What it does |
-|---|---|
-| **Release-Aware Risk Scoring** | Every ticket is scored 0–100 and bands into 🔴 Critical / 🟠 High / 🟡 Medium / 🟢 Low. Dominant signal: release proximity — ≤2 days +70, ≤7 days +35, ≤14 days +20, ≤21 days +5 |
-| **Smart Filters** | Sidebar lets you filter by Tags, Statuses, and Sprint before fetching — preventing massive ticket loads from hitting the API |
-| **PR Diff Viewer** | Click any ticket to pull its linked GitHub PR: title, status, author, files changed, additions/deletions, and raw diff |
-| **QA-7 AI Analyst** | Claude-powered chatbot with two modes: **Technical** (full QA lead analysis) and **Manager** (plain-language summaries). Automatically receives full context of loaded tickets, selected ticket, and PR diff |
-| **Live Jira + GitHub** | Pulls real Jira tickets and GitHub PR diffs via REST API and MCP — no local CSV needed |
-| **Demo Mode** | One-click offline mode with realistic sample data — all four risk bands, a PR collision scenario, and a not-yet-deployed scenario. No credentials required |
-| **Playwright E2E Tests** | Full end-to-end test suite covering all core user flows, running entirely against the demo data layer |
-| **Repo Test Runner** | Run any external repo's Playwright suite from inside PodQApath — test names stream in real time (⬜ → ✅/❌), failed tests show error output inline, and results feed directly into QA-7 context |
+This project is built on a QA philosophy I call **the Nurse System**, developed over six years of QA engineering in IoT property automation — the kind of systems that control whether someone can get through their front door.
+
+The core idea:
+
+> Meet Karen. She's an ICU nurse. She just worked a 13-hour shift. Her phone is at 13%. She's standing at her front door. She doesn't care what changed in your sprint. She cares that her door opens.
+
+In IoT, a failed test isn't a red badge on a dashboard. It's a person standing outside their apartment at 8:30am with nothing left. Traditional QA tooling validates the API response. Karen lives at the device layer — the last step in a chain that can fail silently at every point between.
+
+The Nurse System uses a three-tier risk model:
+
+| Tier | Domain | Example |
+|------|--------|---------|
+| Tier 0 | UI / cosmetic | A label displays incorrectly |
+| Tier 1 | Non-safety device behavior | Lights don't respond, parking sensor glitch |
+| Tier 2 | Resident safety systems | **Door locks. HVAC. Access control.** |
+
+Tier 2 requires human sign-off before release. Always.
+
+**Why HVAC is Tier 2 — not Tier 1:**
+
+During the Moscow heatwave of 2010, an estimated 11,000 people died in the city in a single month — many of them elderly residents in apartments without functioning cooling. The same risk exists in reverse: heating failure in winter is a hypothermia event for vulnerable residents. An IoT thermostat is not a convenience feature. It is a life-safety system with a quiet failure mode. When a software change touches temperature control, the question is not "did the API return 200?" — it is "will Karen's apartment stay habitable?" Those are not the same question, and only one of them matters.
+
+**The Nurse System says:** the job of QA is not to generate test cases faster. The job is to know Karen well enough that when something changes in her world, you catch it before she gets home.
+
+---
+
+## What PodQApath Does Today
+
+This is a **proof of concept** built with Python, Streamlit, and the Anthropic API. In its current state it demonstrates:
+
+- **Pod-Aware Traceability** — Maps Jira custom fields to QA pods for 1:1 requirement-to-environment tracing.
+- **Environment Auditing** — Correlates merged PRs with Jira tickets to surface what's actually deployed vs. what the ticket claims.
+- **QA-7 Analyst Agent** — An AI persona (powered by Claude) that analyzes code churn, flags risk based on release proximity, and detects PR collisions.
+- **Hybrid Data Sourcing** — Live API mode or local CSV audit mode for restricted corporate environments.
+
+It works. Barely. It was built fast and AI-assisted to prove the concept, not to ship. Think of it as the napkin sketch before the architecture.
+
+---
+
+## Where It's Going
+
+PodQApath is evolving toward the Nurse System vision:
+
+- **Karen scenarios in Gherkin** — Structured, human-first test scenarios stored in version-controlled markdown. The AI reads these to understand *who* it's protecting, not just *what* to test.
+- **Risk tiering** — Tier 0 (UI), Tier 1 (non-safety device behavior), Tier 2 (locks, access control, HVAC, resident safety). Karen gets loud at Tier 2. Human sign-off required.
+- **System-connected intelligence** — Moving beyond ticket-derived test generation toward AI that understands service ownership, job queues, device telemetry, and the full command chain from tap to deadbolt.
+- **Elixir/Phoenix backend** — A migration is in progress on a feature branch. The Python/Streamlit prototype will remain as the reference implementation.
+- **Localization** — Japanese language support is in progress (`QA_AGENT.ja.md`), because this work doesn't stop at one company or one country.
 
 ---
 
 ## Tech Stack
 
 | Layer | Technology |
-|---|---|
-| Frontend | React 18 + Vite 5 |
-| Backend | Elixir 1.17 / Phoenix 1.7 — `backend/` |
-| AI | Anthropic API — claude-sonnet-4-6 |
-| Integrations | Jira Software, GitHub (direct HTTP via Req) |
-| Legacy Backend | FastAPI (Python 3.11+) — `main.py` / `mcp_bridge.py` |
+|-------|-----------|
+| UI | Streamlit (Python) |
+| AI | Anthropic SDK (Claude) |
+| Protocol | Model Context Protocol (MCP) |
+| Logic | Python 3.11+ |
+| Integrations | Jira Software, GitHub |
+| Future Backend | Elixir / Phoenix (in progress) |
 
 ---
 
-## Setup Instructions
-
-### 1. Clone the Repo
+## Setup
 
 ```bash
 git clone https://github.com/teddyski/podqapath.git
 cd podqapath
-```
-
-### 2. Install Frontend Dependencies
-
-```bash
-cd frontend
-npm install
-cd ..
-```
-
-### 3. Configure Environment Variables
-
-Copy `.env.example` to `.env` and fill in your values:
-
-```bash
 cp .env.example .env
+pip install -r requirements.txt
+streamlit run app.py
 ```
 
-| Variable | Required | Description |
-|---|---|---|
-| `ANTHROPIC_API_KEY` | ✅ | Your Anthropic API key (for QA-7 chatbot) |
-| `JIRA_BASE_URL` | ✅ | Your Jira instance URL, e.g. `https://your-org.atlassian.net` |
-| `JIRA_EMAIL` | ✅ | Your Jira account email |
-| `JIRA_API_TOKEN` | ✅ | Jira API token — generate at [id.atlassian.com](https://id.atlassian.com/manage-profile/security/api-tokens) |
-| `GITHUB_TOKEN` | ✅ | GitHub personal access token with `repo` (read) scope |
-| `GITHUB_REPO` | Optional | Target repo in `org/repo-name` format |
-| `ANTHROPIC_MODEL` | Optional | Override model (default: `claude-sonnet-4-6`) |
-| `VITE_PROJECT_KEY` | Optional | Default Jira project key pre-filled in the UI |
-| `DEMO_MODE` | Optional | Set to `true` to force all endpoints to return sample data — useful for CI or demos without live credentials |
+Required environment variables in `.env`:
 
-### 4. Start the Backend
-
-**Elixir/Phoenix (recommended)** — listens on port 4000, reads `.env` automatically:
-
-```bash
-cd backend
-mix deps.get
-mix phx.server
-```
-
-**FastAPI (legacy)** — listens on port 8000:
-
-```bash
-uvicorn main:app --reload --port 8000
-# then update frontend/vite.config.js proxy target to http://localhost:8000
-```
-
-### 5. Start the Frontend
-
-```bash
-cd frontend
-npm run dev
-```
-
-Open [http://localhost:5173](http://localhost:5173) in your browser.
-
-> The Vite dev server proxies `/api` to the Phoenix backend on port 4000 by default.
+- `ANTHROPIC_API_KEY`
+- `JIRA_BASE_URL`, `JIRA_EMAIL`, `JIRA_API_TOKEN`
+- `GITHUB_TOKEN`
 
 ---
 
-## Using the Dashboard
+## Why This Exists
 
-### Demo Mode (no credentials needed)
+I spent six years in QA at an IoT company that puts smart locks on apartment doors. I sat in on support calls with elderly residents who couldn't get into their homes. I watched the system grow from a simple control platform into a distributed architecture spanning multiple applications, message brokers, job systems, and device layers — while the QA tooling stayed pointed at the API surface.
 
-Click **🧪 Load Demo Data** in the sidebar to instantly populate the dashboard with realistic sample tickets — no Jira or GitHub credentials required. The demo includes:
+The industry is adopting AI fast. Most of it is shallow: test cases generated from ticket descriptions, documentation assistants, workflow automation. That's fine for a lot of software. It is not fine when your system controls whether someone can get through their front door.
 
-- All four risk bands (🔴🟠🟡🟢)
-- A PR collision scenario — two tickets touching the same auth file
-- A not-yet-deployed scenario — ticket marked "Ready for QA" with an open PR
-- Full fake PR diffs for most tickets
-
-### Connect & Load Filters (live mode)
-1. Enter your Jira **Project Key** in the sidebar (e.g. `SCRUM`)
-2. Click **Connect & Load Filters** to populate Tags, Statuses, and Sprint dropdowns from your live Jira project
-3. Apply any filters you want, then click **☁️ Fetch Live Data**
-
-### View Ticket Risk
-- Each ticket shows its **Risk Band** (🔴🟠🟡🟢), score, and risk reasons
-- Click any ticket to load its linked PR diff in the center column
-
-### QA-7 Chatbot
-- Ask anything about your release: risk summaries, what changed in a PR, whether a ticket is ready to ship
-- Toggle **Manager mode** for plain-language output suited for non-technical stakeholders — switching modes clears chat history
-- QA-7 automatically receives full context: all loaded tickets, the selected ticket's details, and the PR diff
-
----
-
-## Risk Scoring
-
-Scores are 0–100 and clipped. Dominant factor is release proximity:
-
-| Signal | Points |
-|---|---|
-| Release ≤ 2 days | +70 |
-| Release ≤ 7 days | +35 |
-| Release ≤ 14 days | +20 |
-| Release ≤ 21 days | +5 |
-| Critical priority | +30 |
-| High priority | +20 |
-| Medium priority | +10 |
-| Open > 14 days | +10 |
-| No linked PR | +10 |
-| Bug / Incident type | +5 |
-
-| Band | Score |
-|---|---|
-| 🔴 Critical | ≥ 75 |
-| 🟠 High | ≥ 50 |
-| 🟡 Medium | ≥ 25 |
-| 🟢 Low | < 25 |
-
----
-
-## Repo Test Runner
-
-The **🧪 Repo Test Runner** panel lives below the Code Change Viewer. It can be triggered manually or automatically — clicking **▶ Test** on any ticket with a linked GitHub PR will auto-populate the repo URL and start the run immediately.
-
-1. Select a ticket and click **▶ Test** to auto-run against its linked GitHub repo, or enter a path/URL manually
-2. Set the **Base URL** of the QA environment you want to test against (passed as `BASE_URL` env var)
-3. Click **▶ Run Tests** to start manually
-
-PodQApath will:
-- Discover all tests upfront and display them as ⬜ pending
-- Stream results in real time — each test updates to ✅ or ❌ as it completes
-- Show error output inline below the test list for any failures
-- Feed the full results into QA-7 so you can ask questions like *"which tests failed and why?"*
-
-> Works with any repo that has a standard `playwright.config.js` / `.ts` / `.mjs` in its root.
-
----
-
-## Running E2E Tests
-
-The Playwright test suite runs entirely against the demo data layer — no live credentials needed.
-
-```bash
-cd frontend
-npm install
-npx playwright install chromium
-npm run test:e2e
-```
-
-The config (`playwright.config.js`) automatically starts both the backend (with `DEMO_MODE=true`) and the Vite dev server before running tests. Tests cover:
-
-- Loading demo data and populating the ticket list
-- Filter enable state after demo load
-- Ticket selection and PR diff view
-- No-PR state handling
-- Raw diff expand/collapse
-- Chat input (button, Enter, Shift+Enter)
-- Manager mode toggle
-
-To run with the interactive Playwright UI:
-
-```bash
-npm run test:e2e:ui
-```
-
----
-
-## Business Value
-
-PodQApath centralizes deployment data, ticket status, and PR risk into a single command center — reducing triage time and eliminating the collision risk common in shared QA environments where multiple pods touch the same codebase simultaneously.
-
-QA-7's Manager mode bridges the gap between non-technical stakeholders and complex engineering work. QA-1 engineers can ask plain-English questions about complex tickets and epics — getting clear explanations of what changed, why it matters, and what to focus on when testing, without needing to read code or parse technical jargon.
+PodQApath is my attempt to build the thing that should exist: QA tooling that knows who Karen is, knows when her world was touched, and says something about it before she gets home.
 
 ---
 
 ## License
 
-MIT License — free for personal and commercial use. See [LICENSE](LICENSE) for details.
+MIT — free for personal and commercial use. See [LICENSE](LICENSE).
+
+---
+
+*Built by [Thaddeus Skorzewski](https://github.com/teddyski) — QA engineer, flow artist, and someone who still thinks about the person on the other side of the door.*

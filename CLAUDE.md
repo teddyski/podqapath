@@ -105,3 +105,20 @@ block to `ai_log.txt` and notify the user it's ready to compress with `/compact`
 ## QA-7 Persona
 The AI chatbot persona is defined in QA_AGENT.md. Do not modify the tone or
 scoring logic without noting it as a decision in DECISIONS.md.
+
+---
+
+## Karen Scenarios (Nurse System)
+
+Gherkin scenarios for the Karen / Nurse System philosophy live in `scenarios/`.
+
+| File | Purpose |
+|------|---------|
+| `scenarios/karen.feature` | Tier 2 acceptance criteria — front door access under realistic conditions |
+| `scenarios/karen_edge_cases.feature` | Full command chain failure modes (broker, controller, job queue) |
+
+**Rules:**
+- When adding scenarios, think: "what does Karen actually experience?" not "what does the API return?"
+- New Tier 2 behaviors must have a corresponding scenario before they can be released.
+- Scenario files are read by QA-7 to understand coverage — treat them as living documentation, not one-offs.
+- Do not add cosmetic or Tier 0 scenarios to these files. They belong in a separate feature file.
