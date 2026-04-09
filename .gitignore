@@ -1,14 +1,5 @@
-# Python
-.venv/
-__pycache__/
-*.py[cod]
-*.egg-info/
-
 # Environment / secrets
 .env
-
-# Streamlit
-.streamlit/secrets.toml
 
 # OS
 .DS_Store
@@ -23,3 +14,7 @@ ai_log.txt
 frontend/node_modules/
 frontend/dist/
 frontend/.vite/
+
+# Elixir/Phoenix build artifacts
+backend/_build/
+backend/deps/

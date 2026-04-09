@@ -1,0 +1,7 @@
+# env_changes.log
+# Tracks changes to environment configuration and port/proxy settings.
+# Format: [YYYY-MM-DD HH:MM] | FILE | CHANGE
+# ─────────────────────────────────────────────────────────────────────────────
+
+[2026-04-09 07:35] | backend/config/dev.exs    | Changed Phoenix dev port 4000 → 4010 (port 4000 held by svchost on this machine)
+[2026-04-09 07:42] | frontend/vite.config.js   | Updated Vite proxy target 4000 → 4010 to match new Phoenix port
