@@ -8,6 +8,16 @@ It is not production-ready. It is the skeleton of something I intend to build pr
 
 ---
 
+## Why I Built This
+
+I spent six years in QA at an IoT company that puts smart locks on apartment doors. I sat in on support calls with elderly residents who couldn't get into their homes. I watched the system grow from a simple control platform into a distributed architecture spanning multiple applications, message brokers, job systems, and device layers — while the QA tooling stayed pointed at the API surface.
+
+The industry is adopting AI fast. Most of it is shallow: test cases generated from ticket descriptions, documentation assistants, workflow automation. That's fine for a lot of software. It is not fine when your system controls whether someone can get through their front door.
+
+Manual release auditing is slow and error-prone. QA teams routinely spend hours per release reconciling what tickets claim versus what code actually shipped — time that could be spent on the edge cases that actually break things. PodQApath is my attempt to reclaim that time by connecting Jira, GitHub, and AI in a way that surfaces real risk before it reaches Karen.
+
+---
+
 ## The Nurse System
 
 This project is built on a QA philosophy I call **the Nurse System**, developed over six years of QA engineering in IoT property automation — the kind of systems that control whether someone can get through their front door.
@@ -38,25 +48,19 @@ During the Moscow heatwave of 2010, an estimated 11,000 people died in the city 
 
 ## What PodQApath Does Today
 
-This is a **proof of concept** built with Python, Streamlit, and the Anthropic API. In its current state it demonstrates:
-
-- **Pod-Aware Traceability** — Maps Jira custom fields to QA pods for 1:1 requirement-to-environment tracing.
+- **Pod-Aware Traceability** — Maps Jira tickets to QA context for 1:1 requirement tracing.
 - **Environment Auditing** — Correlates merged PRs with Jira tickets to surface what's actually deployed vs. what the ticket claims.
-- **QA-7 Analyst Agent** — An AI persona (powered by Claude) that analyzes code churn, flags risk based on release proximity, and detects PR collisions.
-- **Hybrid Data Sourcing** — Live API mode or local CSV audit mode for restricted corporate environments.
-
-It works. Barely. It was built fast and AI-assisted to prove the concept, not to ship. Think of it as the napkin sketch before the architecture.
+- **QA-7 Analyst Agent** — An AI persona powered by Claude that analyzes code churn, flags risk based on release proximity, and detects PR collisions.
+- **Risk Scoring** — Tickets scored and banded (Critical / High / Medium / Low) based on release proximity, priority, age, and branch activity.
+- **Hybrid Data Sourcing** — Live Jira + GitHub API mode, with a demo mode requiring no credentials.
 
 ---
 
 ## Where It's Going
 
-PodQApath is evolving toward the Nurse System vision:
-
-- **Karen scenarios in Gherkin** — Structured, human-first test scenarios stored in version-controlled markdown. The AI reads these to understand *who* it's protecting, not just *what* to test.
+- **Karen scenarios in Gherkin** — Structured, human-first test scenarios stored in version-controlled feature files. The AI reads these to understand *who* it's protecting, not just *what* to test.
 - **Risk tiering** — Tier 0 (UI), Tier 1 (non-safety device behavior), Tier 2 (locks, access control, HVAC, resident safety). Karen gets loud at Tier 2. Human sign-off required.
 - **System-connected intelligence** — Moving beyond ticket-derived test generation toward AI that understands service ownership, job queues, device telemetry, and the full command chain from tap to deadbolt.
-- **Elixir/Phoenix backend** — A migration is in progress on a feature branch. The Python/Streamlit prototype will remain as the reference implementation.
 - **Localization** — Japanese language support is in progress (`QA_AGENT.ja.md`), because this work doesn't stop at one company or one country.
 
 ---
@@ -65,40 +69,44 @@ PodQApath is evolving toward the Nurse System vision:
 
 | Layer | Technology |
 |-------|-----------|
-| UI | Streamlit (Python) |
+| UI | React (Vite) |
 | AI | Anthropic SDK (Claude) |
-| Protocol | Model Context Protocol (MCP) |
-| Logic | Python 3.11+ |
+| Backend | Elixir / Phoenix |
 | Integrations | Jira Software, GitHub |
-| Future Backend | Elixir / Phoenix (in progress) |
 
 ---
 
 ## Setup
 
+### Backend (Elixir/Phoenix)
+
 ```bash
-git clone https://github.com/teddyski/podqapath.git
-cd podqapath
-cp .env.example .env
-pip install -r requirements.txt
-streamlit run app.py
+cd backend
+mix deps.get
+mix phx.server
+# Runs on http://localhost:4010
 ```
 
-Required environment variables in `.env`:
+### Frontend (React)
 
-- `ANTHROPIC_API_KEY`
-- `JIRA_BASE_URL`, `JIRA_EMAIL`, `JIRA_API_TOKEN`
-- `GITHUB_TOKEN`
+```bash
+cd frontend
+npm install
+npm run dev
+# Runs on http://localhost:5173
+```
 
----
+### Environment variables
 
-## Why This Exists
+Copy `.env.example` to `.env` and fill in:
 
-I spent six years in QA at an IoT company that puts smart locks on apartment doors. I sat in on support calls with elderly residents who couldn't get into their homes. I watched the system grow from a simple control platform into a distributed architecture spanning multiple applications, message brokers, job systems, and device layers — while the QA tooling stayed pointed at the API surface.
-
-The industry is adopting AI fast. Most of it is shallow: test cases generated from ticket descriptions, documentation assistants, workflow automation. That's fine for a lot of software. It is not fine when your system controls whether someone can get through their front door.
-
-PodQApath is my attempt to build the thing that should exist: QA tooling that knows who Karen is, knows when her world was touched, and says something about it before she gets home.
+```
+ANTHROPIC_API_KEY=
+JIRA_BASE_URL=https://yourcompany.atlassian.net
+JIRA_EMAIL=
+JIRA_API_TOKEN=
+GITHUB_TOKEN=
+```
 
 ---
 
